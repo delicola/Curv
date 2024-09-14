@@ -192,15 +192,14 @@ class RicciCurvaturePooling3(nn.Module):
         sig = {}
         for idx in range(x.size(0)):
             sig[idx] = []
-            if cluster[idx].item() in range(len(transfer)):  # 生成正样本
+            if cluster[idx].item() in range(len(new_node_indices)):
                 pos.append(idx)
                 anchor_pos.append(cluster[idx].item())
-                for other_cluster in range(len(transfer)):  # 遍历所有其他聚类
-                    if other_cluster != cluster[idx].item() and other_cluster not in sig[idx]:
-                        # 生成负样本：选择与当前节点不同簇的所有聚类
+                for j in match[idx]:
+                    if j != idx and cluster[j] != cluster[idx] and cluster[j].item() not in sig[idx]:
                         neg.append(idx)
-                        anchor_neg.append(other_cluster)
-                        sig[idx].append(other_cluster)
+                        anchor_neg.append(cluster[j].item())
+                        sig[idx].append(cluster[j].item())
 
         pos_pos = x_pool[pos]
         pos_anchor = new_x[anchor_pos]
@@ -320,9 +319,9 @@ class RicciCurvaturePooling3(nn.Module):
         negative_edges = [edge for edge in restored_edges if full_curvature_edges[edge] < 0]
         negative_edges_set = set(negative_edges)  #这里是为了消除重复边但上面已经少加了所以可以删掉这个--------------------------------
         #打印移除边的数量和曲率
-        print(len(negative_edges))
-        for edge in negative_edges:
-            print(full_curvature_edges[edge])
+        #print(len(negative_edges))
+        #for edge in negative_edges:
+         #   print(full_curvature_edges[edge])
 
 
         #打印原图的边索引数量
