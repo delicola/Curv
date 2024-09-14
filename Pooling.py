@@ -15,6 +15,7 @@ from torch_geometric.utils import from_networkx, add_remaining_self_loops, softm
 from torch_sparse import coalesce
 
 from Pooling1 import RicciCurvaturePooling1
+from Pooling3 import RicciCurvaturePooling3
 
 
 class simiConv(MessagePassing):  # self.gnn_score = simiConv(self.in_channels, 1)
@@ -136,13 +137,13 @@ class RicciCurvaturePooling(nn.Module):
 
     def choose(self, x, x_pool, edge_index, batch, score, match):
         nodes_remaining = set(range(x.size(0)))
-        cluster = torch.empty_like(batch, device=torch.device('cpu'))
+        cluster = torch.empty_like(batch, device=torch.device('cpu')) #对应位置的节点所属的社团编号
         node_argsort = torch.argsort(score, descending=True)
-        i = 0
-        transfer = {}
-        new_node_indices = []
-        tar_in = []
-        tar_tar = []
+        i = 0 #社团编号
+        transfer = {} #key 社团编号 value代表其对应的中心节点
+        new_node_indices = [] #中心节点
+        tar_in = [] #存储社团周围节点
+        tar_tar = [] #存储社团编号
         for node_idx in node_argsort.tolist():  #sort_node 这一次迭代表示将motif合并并用一个新的索引表示这个合并的节点，同时移除原有的这些节点防止重叠
             source = match[node_idx]
 
@@ -172,16 +173,16 @@ class RicciCurvaturePooling(nn.Module):
         #cluster = cluster.to(torch.device('cuda'))
         cluster = cluster.to(x.device)
         index = new_node_indices + nodes_remaining  #融合后还有哪些节点
-        new_x_pool = x_pool[index, :]
+        new_x_pool = x_pool[index, :] #x_pool是所有原始节点的特征向量，new_x_pool是按照排序得到的节点的特征向量
         new_x = torch.cat([x[new_node_indices, :], x_pool[nodes_remaining, :]])
         new_score = score[new_node_indices]
         if len(nodes_remaining) > 0:
             remaining_score = x.new_ones(
                 (new_x.size(0) - len(new_node_indices),))
-            new_score = torch.cat([new_score, remaining_score])
+            new_score = torch.cat([new_score, remaining_score]) #所有社团新的得分，多个节点的社团是原来的得分，单个节点的社团是1
         new_x = new_x * new_score.view(-1, 1)
         N = new_x.size(0)
-        new_edge_index, _ = coalesce(cluster[edge_index], None, N, N)  #用聚类中的序号替换原来的节点索引序号
+        new_edge_index, _ = coalesce(cluster[edge_index], None, N, N)  #用聚类中的序号替换原来的节点索引序号，得到的是社团之间的连接关系
         unpool_info = self.unpool_description(edge_index=edge_index,
                                               cluster=cluster)
 
@@ -190,10 +191,10 @@ class RicciCurvaturePooling(nn.Module):
         anchor_pos = []
         neg = []
         anchor_neg = []
-        sig = {}
+        sig = {}  #key 节点编号，  value是社团编号，key邻居的社团编号，但是这个邻居不和key在一个社团
         for idx in range(x.size(0)):
             sig[idx] = []
-            if cluster[idx].item() in range(len(transfer)):  # 生成正样本
+            if cluster[idx].item() in range(len(transfer)):  # 生成正样本  这个节点所属的社团是大社团，往下走
                 pos.append(idx)
                 anchor_pos.append(cluster[idx].item())
                 for other_cluster in range(len(transfer)):  # 遍历所有其他聚类
@@ -275,7 +276,7 @@ class RicciCurvaturePooling(nn.Module):
 
         loss = self.BCEloss(pos_anchor, pos_pos, neg_anchor, neg_neg)
 
-        # 计算边的 Ricci 曲率
+        # 计算边的 Ricci 曲率,这里进行原始方法的删边操作
         orc = OllivierRicci(G, alpha=self.alpha, verbose=self.verbose)
         curvature_edges = orc.compute_ricci_curvature_edges()
 
@@ -364,11 +365,27 @@ class GraphNet(nn.Module):
         #self.pool = RicciCurvaturePooling1(alpha=0.5, in_channels=out_channels)
         self.conv4 = GCNConv(out_channels, 1)
 
-    def forward(self, G, x):
-        data = from_networkx(G)
+    def edgeIndex(self, G):
+        source_nodes = []
+        target_nodes = []
+        for e in list(G.edges()):
+            n1 = int(e[0])
+            n2 = int(e[1])
+            source_nodes.append(n1)
+            source_nodes.append(n2)
+            target_nodes.append(n2)
+            target_nodes.append(n1)
+        source_nodes = torch.Tensor(source_nodes).reshape((1, -1))
+        target_nodes = torch.Tensor(target_nodes).reshape((1, -1))
+        edge_index = torch.tensor(np.concatenate((source_nodes, target_nodes), axis=0), dtype=torch.long)
 
-        edge_index = data.edge_index
+        return edge_index
+    def forward(self, G, x):
+        #data = from_networkx(G)
+
+        #edge_index = data.edge_index
         #print(edge_index, '\n', edge_index.shape)
+        edge_index = self.edgeIndex(G)
         # print(edge_index.shape)
         # 第一层卷积
         x = F.relu(self.conv1(x, edge_index))
