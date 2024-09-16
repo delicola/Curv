@@ -13,7 +13,8 @@ from torch_geometric.nn import GCNConv, MessagePassing
 from GraphRicciCurvature.OllivierRicci import OllivierRicci
 from torch_geometric.utils import from_networkx, add_remaining_self_loops, softmax
 from torch_sparse import coalesce
-
+from tools import edgeIndex
+import tools
 from Pooling1 import RicciCurvaturePooling1
 from Pooling3 import RicciCurvaturePooling3
 
@@ -99,7 +100,9 @@ class RicciCurvaturePooling(nn.Module):
         if self.GNN is not None:
             self.gnn_intra_cluster.reset_parameters()
 
-    def gen_subs(self, edge_index, N):  #找出节点的邻接节点并将其Conv(self.in_channels, 1)作为子图，并返回相应的索引
+    def gen_subs(self, edge_index_origin, N):  #找出节点的邻接节点并将其Conv(self.in_channels, 1)作为子图，并返回相应的索引
+
+        edge_index = self.drop_edge(edge_index_origin, methods='neg')
         edgelists = defaultdict(list)  # 用于存储每个节点的邻接节点
         match = defaultdict(list)
         for i in range(edge_index.size()[1]):
@@ -118,7 +121,7 @@ class RicciCurvaturePooling(nn.Module):
                 match[i].extend(edgelists[i])
                 start.extend(edgelists[i])
                 end.extend([i] * len(edgelists[i]))
-
+#edgelists不含自身，match是包含自身
         #start = []
         #end = []
         #for i in range(N):
@@ -140,23 +143,27 @@ class RicciCurvaturePooling(nn.Module):
         cluster = torch.empty_like(batch, device=torch.device('cpu')) #对应位置的节点所属的社团编号
         node_argsort = torch.argsort(score, descending=True)
         i = 0 #社团编号
-        transfer = {} #key 社团编号 value代表其对应的中心节点
+        transfer = {} #key 社团编号 value代表其对应的中心节点，这里面孤立节点自己作为一个社团，但他们不在remainnodes中，这样对吗？
         new_node_indices = [] #中心节点
         tar_in = [] #存储社团周围节点
         tar_tar = [] #存储社团编号
         for node_idx in node_argsort.tolist():  #sort_node 这一次迭代表示将motif合并并用一个新的索引表示这个合并的节点，同时移除原有的这些节点防止重叠
             source = match[node_idx]
 
-            d = [True for c in source if c not in nodes_remaining]
-            if d:
-                # print(1)
+            if node_idx not in nodes_remaining: #中心节点被分走，则跳过
                 continue
+            # source.pop(0)
+            if len(source) == 1 and node_idx in source:  #如果节点是一个孤立节点，跳过
+                continue
+
+
+            source = [c for c in source if c in nodes_remaining] #当有一个邻居被分走就跳过？,找到还剩余的邻居，这里面的source是邻居节点
 
             transfer[i] = node_idx  # transfer表示融合后的
 
             new_node_indices.append(node_idx)
             for j in source:
-                cluster[j] = i  #记录哪些节点j被融合到新节点序号i中
+                cluster[j] = i  #记录哪些节点j被融合到新社团序号i中
                 if j != node_idx:
                     tar_in.append(j)
                     tar_tar.append(i)
@@ -197,17 +204,23 @@ class RicciCurvaturePooling(nn.Module):
             if cluster[idx].item() in range(len(transfer)):  # 生成正样本  这个节点所属的社团是大社团，往下走
                 pos.append(idx)
                 anchor_pos.append(cluster[idx].item())
-                for other_cluster in range(len(transfer)):  # 遍历所有其他聚类
-                    if other_cluster != cluster[idx].item() and other_cluster not in sig[idx]:
+                old_match = tools.edgeindex2match(edge_index.tolist())
+                for j in old_match[idx]:  # 遍历所有其他聚类
+                    if j != idx and cluster[j] != cluster[idx] and cluster[j].item() not in sig[idx]:
                         # 生成负样本：选择与当前节点不同簇的所有聚类
                         neg.append(idx)
-                        anchor_neg.append(other_cluster)
-                        sig[idx].append(other_cluster)
+                        anchor_neg.append(cluster[j].item())
+                        sig[idx].append(cluster[j].item())
 
         pos_pos = x_pool[pos]
         pos_anchor = new_x[anchor_pos]
         neg_neg = x_pool[neg]
         neg_anchor = new_x[anchor_neg]
+
+        #基于edgeindex生成match，key为节点编号，value为邻居节点编号
+
+#TODO
+#new_edge_index这里面有问题，不应该是社团之间的索引，我们不会对他融合。
 
         return new_x, new_x_pool, new_edge_index, unpool_info, cluster, transfer, pos_pos, pos_anchor, neg_neg, neg_anchor
 
@@ -249,7 +262,7 @@ class RicciCurvaturePooling(nn.Module):
             x_pool_j = self.gnn_intra_cluster(x=x, edge_index=edge_index)  # 这里用了自注意力gnn对x处理
         # print("x_pool", x_pool.size())
 
-        if self.use_attention:
+        if self.use_attention: #这里面将subindex全都改成edgeindex
             x_pool_j = torch.matmul(x_pool_j, self.weight)
 
             x_pool_j = x_pool_j.view(-1, self.heads, self.in_channels)
@@ -277,68 +290,69 @@ class RicciCurvaturePooling(nn.Module):
         loss = self.BCEloss(pos_anchor, pos_pos, neg_anchor, neg_neg)
 
         # 计算边的 Ricci 曲率,这里进行原始方法的删边操作
-        orc = OllivierRicci(G, alpha=self.alpha, verbose=self.verbose)
-        curvature_edges = orc.compute_ricci_curvature_edges()
+        # orc = OllivierRicci(G, alpha=self.alpha, verbose=self.verbose)
+        # curvature_edges = orc.compute_ricci_curvature_edges()
 
         # 将无向图的边曲率双向存储
-        full_curvature_edges = {}
-        for (u, v), curvature in curvature_edges.items():
-            full_curvature_edges[(u, v)] = curvature
-            full_curvature_edges[(v, u)] = curvature
-
-        set1 = {}
-        for i in G.nodes():
-            i1 = int(unpool_info.cluster[i])
-            if i1 not in set1.keys():
-                set1[i1] = []
-            set1[i1].append(i)
-
-        back = {}
-        restored_edges = []
-        # 构建 back 字典，记录融合后节点与原始节点的映射
-        for i in range(len(cluster)):
-            if int(cluster[i]) in back:
-                back[int(cluster[i])].append(i)
-            else:
-                back[int(cluster[i])] = [i]
-        # 遍历融合图中的每条边
-        for idx in range(new_edge_index.size()[1]):
-            s = int(new_edge_index[0][idx])  # 融合图中的源节点
-            t = int(new_edge_index[1][idx])  # 融合图中的目标节点
-            if s in list(set1.keys()) and t in list(set1.keys()) and s != t:
-                flags = 0
-                flagt = 0
-                if len(back[s]) > 1:
-                    flags = 1
-                if len(back[t]) > 1:
-                    flagt = 1
-                if flags or flagt:
-                    for i in set1[s]:  # 进行还原，每次根据聚类的信息和合并后的edge_index将motif还原成未合并的节点，并查看这些节点的邻居是否在该节点合并的motif相连接的motif中如果有就加上权重
-                        for j in list(G.neighbors(i)):
-                            if j in set1[t]:
-                                restored_edges.append((i, j))
-                                #restored_edges.append((j, i))#再加这个就添加了两遍了本来每个节点就会迭代一次再添加一遍就会重复两次--------------------------------
-                                #判断restored_edges的边曲率是否为负，若为负删除这些边并从edge_index中删除这些边
-        negative_edges = [edge for edge in restored_edges if full_curvature_edges[edge] < 0]
-        negative_edges_set = set(negative_edges)  #这里是为了消除重复边但上面已经少加了所以可以删掉这个--------------------------------
+        # full_curvature_edges = {}
+        # for (u, v), curvature in curvature_edges.items():
+        #     full_curvature_edges[(u, v)] = curvature
+        #     full_curvature_edges[(v, u)] = curvature
+        #
+        # set1 = {}
+        # for i in G.nodes():
+        #     i1 = int(unpool_info.cluster[i])
+        #     if i1 not in set1.keys():
+        #         set1[i1] = []
+        #     set1[i1].append(i)
+        #
+        # back = {}
+        # restored_edges = []
+        # # 构建 back 字典，记录融合后节点与原始节点的映射
+        # for i in range(len(cluster)):
+        #     if int(cluster[i]) in back:
+        #         back[int(cluster[i])].append(i)
+        #     else:
+        #         back[int(cluster[i])] = [i]
+        # # 遍历融合图中的每条边
+        # for idx in range(new_edge_index.size()[1]):
+        #     s = int(new_edge_index[0][idx])  # 融合图中的源节点
+        #     t = int(new_edge_index[1][idx])  # 融合图中的目标节点
+        #     if s in list(set1.keys()) and t in list(set1.keys()) and s != t:
+        #         flags = 0
+        #         flagt = 0
+        #         if len(back[s]) > 1:
+        #             flags = 1
+        #         if len(back[t]) > 1:
+        #             flagt = 1
+        #         if flags or flagt:
+        #             for i in set1[s]:  # 进行还原，每次根据聚类的信息和合并后的edge_index将motif还原成未合并的节点，并查看这些节点的邻居是否在该节点合并的motif相连接的motif中如果有就加上权重
+        #                 for j in list(G.neighbors(i)):
+        #                     if j in set1[t]:
+        #                         restored_edges.append((i, j))
+        #                         #restored_edges.append((j, i))#再加这个就添加了两遍了本来每个节点就会迭代一次再添加一遍就会重复两次--------------------------------
+        #                         #判断restored_edges的边曲率是否为负，若为负删除这些边并从edge_index中删除这些边
+        # negative_edges = [edge for edge in restored_edges if full_curvature_edges[edge] < 0]
+        # negative_edges_set = set(negative_edges)  #这里是为了消除重复边但上面已经少加了所以可以删掉这个--------------------------------
         #打印移除边的数量和曲率
         #打印原图的边索引数量
         #print(2 * len(G.edges))  #这里的edge_index是哪个怎么每次运行都不变？--------------------------
         #print(len(negative_edges))
         #for edge in negative_edges:
         #   print(full_curvature_edges[edge])
-        new_edge_index = []
-        for (u, v) in G.edges():
-            if (u, v) not in negative_edges_set and (
-            v, u) not in negative_edges_set:  #debug检查new_edge_index是哪个要不要换名字写成new_edge_index1啥的
-                new_edge_index.append([u, v])
-                new_edge_index.append([v, u])
+        # new_edge_index = []
+        # for (u, v) in G.edges():
+        #     if (u, v) not in negative_edges_set and (
+        #     v, u) not in negative_edges_set:  #debug检查new_edge_index是哪个要不要换名字写成new_edge_index1啥的
+        #         new_edge_index.append([u, v])
+        #         new_edge_index.append([v, u])
 
         # 将列表转换为 NumPy 数组
         new_edge_index = np.array(new_edge_index)
 
         # 转置数组，使其成为形状为 [2, num_edges] 的数组
-        new_edge_index = new_edge_index.T
+        #todo 这里买呢为什么要转置呢，这样会报错
+        # new_edge_index = new_edge_index.T
 
         # 将 NumPy 数组转换为 PyTorch 张量
         new_edge_index = torch.tensor(new_edge_index, dtype=torch.long)
@@ -354,6 +368,41 @@ class RicciCurvaturePooling(nn.Module):
         G.add_edges_from(edge_list)
         return G
 
+    def drop_edge(self, edge_index, methods = 'neg'):
+        G = self.convert_edge_index_to_graph(edge_index)
+        orc = OllivierRicci(G, alpha=self.alpha, verbose=self.verbose)
+        orc.compute_ricci_curvature()
+        edge_rc_list = list(orc.G.edges.data("ricciCurvature"))
+        edge_rc_all = [rc[2] for rc in edge_rc_list]
+        x = 0
+        y = 0
+        edge_neg = []
+        edge_pos = []
+        edge_zero = []
+        for i in edge_rc_all:
+            if i < 0:
+                x += 1
+                edge_neg.append(i)
+            elif i > 0:
+                y += 1
+                edge_pos.append(i)
+            else:
+                edge_zero.append(i)
+        if methods == 'neg':
+            for i in range(len(edge_rc_list)):
+                if edge_rc_list[i][2] < 0:
+                    G.remove_edge(edge_rc_list[i][0], edge_rc_list[i][1])
+        elif methods == 'pos':
+            for i in range(len(edge_rc_list)):
+                if edge_rc_list[i][2] > 0:
+                    G.remove_edge(edge_rc_list[i][0], edge_rc_list[i][1])
+        # G2 = tools.add_self_loop(G)
+        edge_index = edgeIndex(G)
+
+        return edge_index
+
+
+
 
 class GraphNet(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
@@ -365,27 +414,27 @@ class GraphNet(nn.Module):
         #self.pool = RicciCurvaturePooling1(alpha=0.5, in_channels=out_channels)
         self.conv4 = GCNConv(out_channels, 1)
 
-    def edgeIndex(self, G):
-        source_nodes = []
-        target_nodes = []
-        for e in list(G.edges()):
-            n1 = int(e[0])
-            n2 = int(e[1])
-            source_nodes.append(n1)
-            source_nodes.append(n2)
-            target_nodes.append(n2)
-            target_nodes.append(n1)
-        source_nodes = torch.Tensor(source_nodes).reshape((1, -1))
-        target_nodes = torch.Tensor(target_nodes).reshape((1, -1))
-        edge_index = torch.tensor(np.concatenate((source_nodes, target_nodes), axis=0), dtype=torch.long)
-
-        return edge_index
+    # def edgeIndex(self, G):
+    #     source_nodes = []
+    #     target_nodes = []
+    #     for e in list(G.edges()):
+    #         n1 = int(e[0])
+    #         n2 = int(e[1])
+    #         source_nodes.append(n1)
+    #         source_nodes.append(n2)
+    #         target_nodes.append(n2)
+    #         target_nodes.append(n1)
+    #     source_nodes = torch.Tensor(source_nodes).reshape((1, -1))
+    #     target_nodes = torch.Tensor(target_nodes).reshape((1, -1))
+    #     edge_index = torch.tensor(np.concatenate((source_nodes, target_nodes), axis=0), dtype=torch.long)
+    #
+    #     return edge_index
     def forward(self, G, x):
         #data = from_networkx(G)
 
         #edge_index = data.edge_index
         #print(edge_index, '\n', edge_index.shape)
-        edge_index = self.edgeIndex(G)
+        edge_index = edgeIndex(G)
         # print(edge_index.shape)
         # 第一层卷积
         x = F.relu(self.conv1(x, edge_index))
@@ -410,7 +459,15 @@ class GraphNet(nn.Module):
 
 # 示例用法
 #G = nx.karate_club_graph()
-G = nx.barabasi_albert_graph(100, 3)
+# G = nx.barabasi_albert_graph(100, 3)
+path = './data/BA_{}.gml'.format(100_3)
+# G.remove_nodes_from(list(nx.isolates(G)))
+# G.remove_edges_from(nx.selfloop_edges(G))
+# G.graph['path'] = path
+# tools.save_graph_gml(G)
+
+G = nx.read_gml(path, destringizer = int, label='id')
+#
 num_nodes = G.number_of_nodes()
 # 生成独热编码的特征矩阵
 feature = torch.eye(num_nodes, dtype=torch.float)

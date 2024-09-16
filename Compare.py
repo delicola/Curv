@@ -79,11 +79,13 @@ def network_dismantling_plot(G, args):
     plt.legend()
     plt.show()
 
+path = './data/BA_{}.gml'.format(100)
 
+G = nx.read_gml(path, destringizer = int, label='id')
 
 args = parser.parse_args()
-G = nx.barabasi_albert_graph(100,2)
-path = './data/synthetic/BA_{}/BA_{}.gml'.format(100,100)
-G.graph['path'] = path
+# G = nx.barabasi_albert_graph(100,2)
+# path = './data/synthetic/BA_{}/BA_{}.gml'.format(100,100)
+# G.graph['path'] = path
 generate_rank_list(G, args)
 network_dismantling_plot(G, args)

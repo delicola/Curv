@@ -9,6 +9,7 @@ import random
 import math
 import argparse
 from GraphRicciCurvature.OllivierRicci import OllivierRicci
+import torch
 from collections import Counter
 
 def sortbydict(dict):
@@ -249,6 +250,53 @@ ranking_list = [1, 2, 3, 4, 5]
 mi_value = cal_MI(ranking_list)
 print("Monotonicity Index (MI):", mi_value)
 
+
+def edgeIndex(G): #这里是双向连边
+    source_nodes = []
+    target_nodes = []
+    for e in list(G.edges()):
+
+        n1 = int(e[0])
+        n2 = int(e[1])
+        if e[0] == e[1]:
+            source_nodes.append(n1)
+            target_nodes.append(n2)
+            continue
+        source_nodes.append(n1)
+        source_nodes.append(n2)
+        target_nodes.append(n2)
+        target_nodes.append(n1)
+    source_nodes = torch.Tensor(source_nodes).reshape((1, -1))
+    target_nodes = torch.Tensor(target_nodes).reshape((1, -1))
+    edge_index = torch.tensor(np.concatenate((source_nodes, target_nodes), axis=0), dtype=torch.long)
+
+    return edge_index
+
+def save_graph_gml(G):
+    GraphFile = G.graph['path']
+    File = os.path.join(GraphFile)
+    nx.write_gml(G, File, stringizer= str)
+
+
+
+def edgeindex2match(edge_index):
+    match = {} #key为节点编号，value为邻居节点编号
+    for i in range(len(edge_index[0])):
+        if edge_index[0][i] in match.keys():
+            match[edge_index[0][i]].append(edge_index[1][i])
+        else:
+            match[edge_index[0][i]] = [edge_index[1][i]]
+        if edge_index[1][i] in match.keys():
+            match[edge_index[1][i]].append(edge_index[0][i])
+        else:
+            match[edge_index[1][i]] = [edge_index[0][i]]
+    return match
+# def trans_edgeindex(edge_index):#将edge_index的第二维全都改成end
+
+# def add_self_loop(G):
+#     for node in G.nodes():
+#         G.add_edge(node, node)
+#     return G
 
 # num_nodes = 500
 # tau1 = 3
