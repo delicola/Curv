@@ -8,7 +8,7 @@ import copy
 import torch.optim as optim
 
 
-def rank_by_curv(G, ep = 100):
+def rank_by_curv(G, ep = 1):
     num_nodes = G.number_of_nodes()
     feature = torch.eye(num_nodes, dtype=torch.float)
     model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
