@@ -12,8 +12,8 @@ from GraphRicciCurvature.OllivierRicci import OllivierRicci
 import torch
 from collections import Counter
 
-def sortbydict(dict):
-    remove = sorted(dict.items(), key=lambda x: x[1], reverse=True)
+def sortbydict(dict, reverse = True):
+    remove = sorted(dict.items(), key=lambda x: x[1], reverse=reverse)
     removelist = []
     for i in range(len(remove)):
         removelist.append(remove[i][0])

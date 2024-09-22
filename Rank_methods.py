@@ -24,7 +24,7 @@ def rank_by_curv(G, ep = 200):
         optimizer.step()
         print(loss3)
     # out, updated_edge_index, loss3, rank_dict = model(G, feature)
-    rank =tools.sortbydict(rank_dict)
+    rank =tools.sortbydict(rank_dict, reverse=False)
     n = list(rank_dict.values())
     m = [float('%.4f' % i) for i in n]
     # print("网络：{}, MI of curv: {}".format(name, tools.cal_MI(m)))

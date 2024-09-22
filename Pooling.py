@@ -189,6 +189,8 @@ class RicciCurvaturePooling(nn.Module):
             new_score = torch.cat([new_score, remaining_score]) #所有社团新的得分，多个节点的社团是原来的得分，单个节点的社团是1
         new_x = new_x * new_score.view(-1, 1)
         N = new_x.size(0)
+        #todo
+        #不需要社团之间的连边
         new_edge_index, _ = coalesce(cluster[edge_index], None, N, N)  #用聚类中的序号替换原来的节点索引序号，得到的是社团之间的连接关系
         unpool_info = self.unpool_description(edge_index=edge_index,
                                               cluster=cluster)
@@ -348,14 +350,14 @@ class RicciCurvaturePooling(nn.Module):
         #         new_edge_index.append([v, u])
 
         # 将列表转换为 NumPy 数组
-        new_edge_index = np.array(new_edge_index)
+        # new_edge_index = np.array(new_edge_index)
 
         # 转置数组，使其成为形状为 [2, num_edges] 的数组
         #todo 这里买呢为什么要转置呢，这样会报错
         # new_edge_index = new_edge_index.T
 
         # 将 NumPy 数组转换为 PyTorch 张量
-        new_edge_index = torch.tensor(new_edge_index, dtype=torch.long)
+        # new_edge_index = torch.tensor(new_edge_index, dtype=torch.long)
 
         return x_pool, new_edge_index, unpool_info, fitness, loss
         #return x, new_edge_index, unpool_info, cluster, fitness, loss
