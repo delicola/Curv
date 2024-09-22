@@ -79,7 +79,8 @@ def network_dismantling_plot(G, args):
     plt.legend()
     plt.show()
 
-path = './data/BA_{}.gml'.format(100)
+# path = './data/BA_{}.gml'.format(100)
+path = './data/LFR_{}.gml'.format(200)
 
 G = nx.read_gml(path, destringizer = int, label='id')
 
@@ -89,3 +90,6 @@ args = parser.parse_args()
 # G.graph['path'] = path
 generate_rank_list(G, args)
 network_dismantling_plot(G, args)
+#输出节点度值
+print(G.degree())
+

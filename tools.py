@@ -286,10 +286,10 @@ def edgeindex2match(edge_index):
             match[edge_index[0][i]].append(edge_index[1][i])
         else:
             match[edge_index[0][i]] = [edge_index[1][i]]
-        if edge_index[1][i] in match.keys():
-            match[edge_index[1][i]].append(edge_index[0][i])
-        else:
-            match[edge_index[1][i]] = [edge_index[0][i]]
+        # if edge_index[1][i] in match.keys():
+        #     match[edge_index[1][i]].append(edge_index[0][i])
+        # else:
+        #     match[edge_index[1][i]] = [edge_index[0][i]]
     return match
 # def trans_edgeindex(edge_index):#将edge_index的第二维全都改成end
 
