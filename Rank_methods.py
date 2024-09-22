@@ -4,6 +4,7 @@ from Pooling import GraphNet
 import torch
 import time
 import copy
+from tqdm import tqdm
 
 import torch.optim as optim
 
@@ -24,7 +25,9 @@ def rank_by_curv(G, ep = 100):
         optimizer.step()
         print(loss3)
     # out, updated_edge_index, loss3, rank_dict = model(G, feature)
-    rank =tools.sortbydict(rank_dict)
+    print(rank_dict)
+    rank =tools.sortbydict(rank_dict, reverse=True)
+    print(rank)
     n = list(rank_dict.values())
     m = [float('%.4f' % i) for i in n]
     # print("网络：{}, MI of curv: {}".format(name, tools.cal_MI(m)))
@@ -38,6 +41,7 @@ def rank_by_degree(G):
     rank_list_degree = tools.sortbydict(dict(G.degree()))
     n = list(dict(G.degree()).values())
     m = [float('%.4f' % i) for i in n]
+    print(rank_list_degree)
     # print("网络：{}, MI of degree: {}".format(name, tools.cal_MI(m)))
 
     return rank_list_degree
