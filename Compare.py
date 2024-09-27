@@ -8,7 +8,7 @@ import pandas as pd
 import networkx as nx
 from config import parser
 
-methods = ['degree', 'curv']
+methods = ['degree', 'curv', 'curv2']
 
 
 def generate_rank_list(G, args, methods = methods):
@@ -35,17 +35,18 @@ def generate_rank_list(G, args, methods = methods):
             G.graph['rank_curv']
         except KeyError:
             time_start = time.time()
-            G.graph['rank_curv'] = rank_by_curv(G)
+            G.graph['rank_curv'] , G.graph['rank_curv2']= rank_by_curv(G)
             time_end = time.time()
             time_sum = time_end - time_start
             logger.info('{} 数据集,curv方法生成节点排序列表的时间是：{}s'.format(datasetname, time_sum))
         finally:
             if args.recalculate is True:
                 time_start = time.time()
-                G.graph['rank_curv'] = rank_by_curv(G)
+                G.graph['rank_curv'] , G.graph['rank_curv2'] = rank_by_curv(G)
                 time_end = time.time()
                 time_sum = time_end - time_start
                 logger.info('{} 数据集,重新计算的curv方法生成节点排序列表的时间是：{}s'.format(datasetname, time_sum))
+
 
 def network_dismantling_plot(G, args):
     datasetname = os.path.split(G.graph['path'])[1][0:-4]
@@ -79,6 +80,7 @@ def network_dismantling_plot(G, args):
     plt.legend()
     plt.show()
 
+#path = './data/BA_{}.gml'.format(1003)
 # path = './data/BA_{}.gml'.format(100)
 path = './data/LFR_{}.gml'.format(200)
 

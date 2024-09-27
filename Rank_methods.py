@@ -9,12 +9,13 @@ from tqdm import tqdm
 import torch.optim as optim
 
 
-def rank_by_curv(G, ep = 100):
+def rank_by_curv(G, ep = 50, reverse = True):
+
     num_nodes = G.number_of_nodes()
     feature = torch.eye(num_nodes, dtype=torch.float)
     model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
-    for epoch in range(ep):
+    for epoch in tqdm(range(ep)):
         t = time.time()
         model.train()
         G0 = copy.deepcopy(G)
@@ -26,12 +27,13 @@ def rank_by_curv(G, ep = 100):
         print(loss3)
     # out, updated_edge_index, loss3, rank_dict = model(G, feature)
     print(rank_dict)
-    rank =tools.sortbydict(rank_dict, reverse=True)
+    rank =tools.sortbydict(rank_dict, reverse=reverse)
+    rank2 = tools.sortbydict(rank_dict, reverse=False)
     print(rank)
     n = list(rank_dict.values())
     m = [float('%.4f' % i) for i in n]
     # print("网络：{}, MI of curv: {}".format(name, tools.cal_MI(m)))
-    return rank
+    return rank, rank2
 
 def rank_by_degree(G):
     # graph_path = os.path.join('./data/{}/{}-{}.gml'.format(dataset_name, dataset_name, high_dim))

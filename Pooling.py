@@ -9,14 +9,14 @@ import numpy as np
 import networkx as nx
 from torch_scatter import scatter
 from torch.nn import Parameter, Linear
-from torch_geometric.nn import GCNConv, MessagePassing
+from torch_geometric.nn import GCNConv, MessagePassing, GATConv
 from GraphRicciCurvature.OllivierRicci import OllivierRicci
 from torch_geometric.utils import from_networkx, add_remaining_self_loops, softmax
 from torch_sparse import coalesce
 from tools import edgeIndex
 import tools
 from Pooling1 import RicciCurvaturePooling1
-from Pooling3 import RicciCurvaturePooling3
+
 
 
 class simiConv(MessagePassing):  # self.gnn_score = simiConv(self.in_channels, 1)
@@ -78,6 +78,8 @@ class RicciCurvaturePooling(nn.Module):
         self.lin = Linear(in_channels, in_channels)
         self.att = Linear(2 * in_channels, in_channels)
         self.gnn_score = simiConv(self.in_channels, 1)
+
+
         self.marginloss = nn.MarginRankingLoss(0.5)
         self.BCEWloss = nn.BCEWithLogitsLoss()
         self.CosineLoss = nn.CosineEmbeddingLoss(margin=0.2)
@@ -102,9 +104,8 @@ class RicciCurvaturePooling(nn.Module):
         if self.GNN is not None:
             self.gnn_intra_cluster.reset_parameters()
 
-    def gen_subs(self, edge_index_origin, N):  #找出节点的邻接节点并将其Conv(self.in_channels, 1)作为子图，并返回相应的索引
+    def gen_subs(self, edge_index, N):  #找出节点的邻接节点并将其Conv(self.in_channels, 1)作为子图，并返回相应的索引
 
-        edge_index = self.drop_edge(edge_index_origin, methods='neg')
         edgelists = defaultdict(list)  # 用于存储每个节点的邻接节点
         match = defaultdict(list)
         for i in range(edge_index.size()[1]):
@@ -147,6 +148,7 @@ class RicciCurvaturePooling(nn.Module):
         i = 0 #社团编号
         transfer = {} #key 社团编号 value代表其对应的中心节点，这里面孤立节点自己作为一个社团，但他们不在remainnodes中，这样对吗？
         new_node_indices = [] #中心节点
+
         tar_in = [] #存储社团周围节点
         tar_tar = [] #存储社团编号
         for node_idx in node_argsort.tolist():  #sort_node 这一次迭代表示将motif合并并用一个新的索引表示这个合并的节点，同时移除原有的这些节点防止重叠
@@ -161,7 +163,7 @@ class RicciCurvaturePooling(nn.Module):
 
             source = [c for c in source if c in nodes_remaining] #当有一个邻居被分走就跳过？,找到还剩余的邻居，这里面的source是邻居节点
 
-            transfer[i] = node_idx  # transfer表示融合后的
+            transfer[i] = node_idx  #transfer表示融合后的
 
             new_node_indices.append(node_idx)
             for j in source:
@@ -183,7 +185,7 @@ class RicciCurvaturePooling(nn.Module):
         cluster = cluster.to(x.device)
         index = new_node_indices + nodes_remaining  #融合后还有哪些节点
         new_x_pool = x_pool[index, :] #x_pool是所有原始节点的特征向量，new_x_pool是按照排序得到的节点的特征向量
-        new_x = torch.cat([x[new_node_indices, :], x_pool[nodes_remaining, :]])#所有社团的特征
+        new_x = torch.cat([x[new_node_indices, :], x_pool[nodes_remaining, :]]) #所有社团的特征
         new_score = score[new_node_indices]
         if len(nodes_remaining) > 0:
             remaining_score = x.new_ones(
@@ -202,13 +204,13 @@ class RicciCurvaturePooling(nn.Module):
         anchor_pos = []
         neg = []
         anchor_neg = []
-        sig = {}  #key 节点编号，  value是社团编号，key邻居的社团编号，但是这个邻居不和key在一个社团
+        sig = {}
+        old_match = tools.edgeindex2match(old_index.tolist())#key 节点编号，  value是社团编号，key邻居的社团编号，但是这个邻居不和key在一个社团
         for idx in range(x.size(0)):
             sig[idx] = []
             if cluster[idx].item() in range(len(transfer)):  # 生成正样本  这个节点所属的社团是大社团，往下走
                 pos.append(idx)
                 anchor_pos.append(cluster[idx].item())
-                old_match = tools.edgeindex2match(old_index.tolist())
                 for j in old_match[idx]:  # 遍历所有其他聚类
                     if j != idx and cluster[j] != cluster[idx] and cluster[j].item() not in sig[idx]:
                         # 生成负样本：选择与当前节点不同簇的所有聚类
@@ -247,7 +249,7 @@ class RicciCurvaturePooling(nn.Module):
 
     def forward(self, x, edge_index, old_index, batch=None):
         # 将 edge_index 转换为 NetworkX 图
-        G = self.convert_edge_index_to_graph(edge_index)
+        G = tools.convert_edge_index_to_graph(edge_index)
         N = x.size(0)
         if N == 1:
             unpool_info = self.unpool_description(edge_index=edge_index,
@@ -286,10 +288,10 @@ class RicciCurvaturePooling(nn.Module):
 
             x = scatter(v_j, subindex[1], dim=0, reduce='add')
 
-            x = x.mean(dim=1)  # 就是h向量
+            x = x.mean(dim=1)  # 就是h向量社团特征
 
         fitness = self.gnn_score(x, subindex).sigmoid().view(-1)
-        x_pool = self.GCN(x_pool, subindex)
+        #x_pool = self.GCN(x_pool, subindex)
 
         x, new_x_pool, cluster, transfer, pos_pos, pos_anchor, neg_neg, neg_anchor = self.choose(
             x, x_pool, edge_index, batch, fitness, match, old_index)
@@ -301,49 +303,9 @@ class RicciCurvaturePooling(nn.Module):
         return x_pool, subindex, fitness, loss
         #return x, new_edge_index, unpool_info, cluster, fitness, loss
 
-    @staticmethod
-    def convert_edge_index_to_graph(edge_index):
-        #将 edge_index 转换为 NetworkX 图
-        G = nx.Graph()
-        edge_list = edge_index.t().tolist()
-        G.add_edges_from(edge_list)
-        return G
 
-    def drop_edge(self, edge_index, methods = 'neg'):
-        G = self.convert_edge_index_to_graph(edge_index)
-        orc = OllivierRicci(G, alpha=self.alpha, verbose=self.verbose)
-        orc.compute_ricci_curvature()
-        edge_rc_list = list(orc.G.edges.data("ricciCurvature"))
-        edge_rc_all = [rc[2] for rc in edge_rc_list]
-        x = 0
-        y = 0
-        edge_neg = []
-        edge_pos = []
-        edge_zero = []
-        for i in edge_rc_all:
-            if i < 0:
-                x += 1
-                edge_neg.append(i)
-            elif i > 0:
-                y += 1
-                edge_pos.append(i)
-            else:
-                edge_zero.append(i)
-        if methods == 'neg':
-            for i in range(len(edge_rc_list)):
-                if edge_rc_list[i][2] < 0:
-                    G.remove_edge(edge_rc_list[i][0], edge_rc_list[i][1])
-        elif methods == 'pos':
-            for i in range(len(edge_rc_list)):
-                if edge_rc_list[i][2] > 0:
-                    G.remove_edge(edge_rc_list[i][0], edge_rc_list[i][1])
-        # G2 = tools.add_self_loop(G)
-        edge_index = edgeIndex(G)
-        print('负曲率边数{}'.format(len(edge_neg)))
-        print('正曲率边数{}'.format(len(edge_pos)))
-        print('零曲率边数{}'.format(len(edge_zero)))
 
-        return edge_index
+
 
 
 
@@ -352,12 +314,16 @@ class GraphNet(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(GraphNet, self).__init__()
         self.conv1 = GCNConv(in_channels, hidden_channels)
-        # self.conv2 = GCNConv(hidden_channels, hidden_channels)
+        #self.conv2 = GCNConv(hidden_channels, hidden_channels)
         self.conv3 = GCNConv(hidden_channels, out_channels)
-        self.pool = RicciCurvaturePooling(alpha=0.5, in_channels=out_channels)
+        self.conv4 = GATConv(out_channels, out_channels)
+        #self.conv4 = GATConv(out_channels, out_channels, heads=6, dropout=0.6)
+        self.pool1 = RicciCurvaturePooling(alpha=0.5, in_channels=out_channels)
+        #self.pool2 = RicciCurvaturePooling(alpha=0.5, in_channels=out_channels*6)
         self.pool2 = RicciCurvaturePooling(alpha=0.5, in_channels=out_channels)
-        #self.pool = RicciCurvaturePooling1(alpha=0.5, in_channels=out_channels)
-        self.lin = Linear(out_channels, 1)
+        #self.lin = Linear(out_channels, 1)
+        #self.final_score = simiConv(out_channels*6, 1)
+        self.final_score = simiConv(out_channels, 1)
 
     # def edgeIndex(self, G):
     #     source_nodes = []
@@ -380,19 +346,28 @@ class GraphNet(nn.Module):
         #edge_index = data.edge_index
         #print(edge_index, '\n', edge_index.shape)
         edge_index = edgeIndex(G)
+        #TODU
         # print(edge_index.shape)
         # 第一层卷积
         x = F.relu(self.conv1(x, edge_index))
+
         # 第二层卷积
         # x = F.relu(self.conv2(x, edge_index))
         # 第三层卷积
         x = F.relu(self.conv3(x, edge_index))
         # 应用池化层，删除曲率为负的边，更新后的 edge_index 和 x 会传递给下一层
-        x_pool1, new_edge_index1, fitness1, loss1 = self.pool(x, edge_index, edge_index)
-        x_pool2, new_edge_index2, fitness2, loss2 = self.pool2(x_pool1, new_edge_index1, edge_index)
+        x_pool1, new_edge_index1, fitness1, loss1 = self.pool1(x, edge_index, edge_index)
+        drop_edge_index = tools.drop_edge(edge_index, methods='neg')
+        x = F.relu(self.conv4(x_pool1, edge_index))
 
+        x_pool2, new_edge_index2, fitness2, loss2 = self.pool2(x, drop_edge_index, edge_index)
+
+        x1 = self.final_score(x_pool2, edge_index)
+        #x_pool2, new_edge_index2, fitness2, loss2 = self.pool2(x_pool1, new_edge_index1, edge_index)
+        #x_pool3, new_edge_index3, fitness3, loss3 = self.pool3(x_pool2, new_edge_index2, edge_index)
         #x, new_edge_index1, unpool_info, cluster, fitness, loss = self.pool(x, edge_index)
-        x1 = F.relu(self.lin(x_pool2))
+
+        #x1 = F.relu(self.lin(x_pool3))
         # x1 = F.relu(self.conv4(x_pool, new_edge_index1))
         x1 = torch.sigmoid(x1)
         rank_dict = {}
@@ -406,30 +381,30 @@ class GraphNet(nn.Module):
 
 
 # 示例用法
-# #G = nx.karate_club_graph()
-# # G = nx.barabasi_albert_graph(100, 3)
-# path = './data/BA_{}.gml'.format(100_3)
-# # G.remove_nodes_from(list(nx.isolates(G)))
-# # G.remove_edges_from(nx.selfloop_edges(G))
-# # G.graph['path'] = path
-# # tools.save_graph_gml(G)
+#G = nx.karate_club_graph()
+# G = nx.barabasi_albert_graph(100, 3)
+path = './data/BA_{}.gml'.format(100_3)
+# G.remove_nodes_from(list(nx.isolates(G)))
+# G.remove_edges_from(nx.selfloop_edges(G))
+# G.graph['path'] = path
+# tools.save_graph_gml(G)
+
+G = nx.read_gml(path, destringizer = int, label='id')
 #
-# G = nx.read_gml(path, destringizer = int, label='id')
-# #
-# num_nodes = G.number_of_nodes()
-# # 生成独热编码的特征矩阵
-# feature = torch.eye(num_nodes, dtype=torch.float)
-#
-# # 创建模型并运行前向传播
-# model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
-# #out, updated_edge_index, unpool_info1, cluster1, fitness1, loss1 = model(G, feature)
-# out, updated_edge_index, loss3, rank_dict = model(G, feature)
-# print(out.shape)  # 输出的特征矩阵形状
-# print(out)  # 输出的特征矩阵
-# print(updated_edge_index)  # 输出更新后的边索引
-# #print(updated_edge_index.shape)
-# #print(unpool_info1)  # 输出池化信息
-# #print(cluster1) # 输出 cluster 信息
-# #print(fitness1)  # 输出 fitness 信息
-# print(loss3)  # 输出 loss 信息
-# print(rank_dict)  # 输出 rank_dict 信息
+num_nodes = G.number_of_nodes()
+# 生成独热编码的特征矩阵
+feature = torch.eye(num_nodes, dtype=torch.float)
+
+# 创建模型并运行前向传播
+model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
+#out, updated_edge_index, unpool_info1, cluster1, fitness1, loss1 = model(G, feature)
+out, updated_edge_index, loss3, rank_dict = model(G, feature)
+print(out.shape)  # 输出的特征矩阵形状
+print(out)  # 输出的特征矩阵
+print(updated_edge_index)  # 输出更新后的边索引
+#print(updated_edge_index.shape)
+#print(unpool_info1)  # 输出池化信息
+#print(cluster1) # 输出 cluster 信息
+#print(fitness1)  # 输出 fitness 信息
+print(loss3)  # 输出 loss 信息
+print(rank_dict)  # 输出 rank_dict 信息

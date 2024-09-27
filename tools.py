@@ -10,7 +10,12 @@ import math
 import argparse
 from GraphRicciCurvature.OllivierRicci import OllivierRicci
 import torch
+# from config import parser
 from collections import Counter
+
+
+
+# args = parser.parse_args()
 
 def sortbydict(dict, reverse = True):
     remove = sorted(dict.items(), key=lambda x: x[1], reverse=reverse)
@@ -291,6 +296,62 @@ def edgeindex2match(edge_index):
         # else:
         #     match[edge_index[1][i]] = [edge_index[0][i]]
     return match
+
+def convert_edge_index_to_graph(edge_index):
+    #将 edge_index 转换为 NetworkX 图
+    G = nx.Graph()
+    edge_list = edge_index.t().tolist()
+    G.add_edges_from(edge_list)
+    return G
+
+def drop_edge(edge_index, methods = 'neg', alpha = 0.5, verbose = 'INFO'):
+    G = convert_edge_index_to_graph(edge_index)
+    orc = OllivierRicci(G, alpha=alpha, verbose=verbose)
+    orc.compute_ricci_curvature()
+    #orc.compute_ricci_flow(iterations=10)
+    edge_rc_list = list(orc.G.edges.data("ricciCurvature"))
+    #edge_rc_list = list(orc.G.edges.data("weight"))
+    edge_rc_all = [rc[2] for rc in edge_rc_list]
+    x = 0
+    y = 0
+    edge_neg = []
+    edge_pos = []
+    edge_zero = []
+    for i in edge_rc_all:
+        if i < 0:
+            x += 1
+            edge_neg.append(i)
+        elif i > 0:
+            y += 1
+            edge_pos.append(i)
+        else:
+            edge_zero.append(i)
+    if methods == 'neg':
+        edge_rc_list_sorted = sorted(edge_rc_list, key=lambda x: x[2])
+        # num_edges_to_remove = int(len(edge_rc_list_sorted) * args.drop_percent)
+        num_edges_to_remove = int(len(edge_rc_list_sorted) * 0.40)
+        edges_to_remove = edge_rc_list_sorted[:num_edges_to_remove]
+        for edge in edges_to_remove:
+            G.remove_edge(edge[0], edge[1])
+    elif methods == 'pos':
+        for i in range(len(edge_rc_list)):
+            if edge_rc_list[i][2] > 0:
+                G.remove_edge(edge_rc_list[i][0], edge_rc_list[i][1])
+    elif methods == 'drop_percent':
+        edge_rc_list_sorted = sorted(edge_rc_list, key=lambda x: x[2])
+        num_edges_to_remove = int(len(edge_rc_list_sorted) * 0.30)
+        edges_to_remove = edge_rc_list_sorted[:num_edges_to_remove]
+        for edge in edges_to_remove:
+            G.remove_edge(edge[0], edge[1])
+
+    # G2 = tools.add_self_loop(G)
+    edge_index = edgeIndex(G)
+    print('负曲率边数{}'.format(len(edge_neg)))
+    print('正曲率边数{}'.format(len(edge_pos)))
+    print('零曲率边数{}'.format(len(edge_zero)))
+
+    return edge_index
+
 # def trans_edgeindex(edge_index):#将edge_index的第二维全都改成end
 
 # def add_self_loop(G):

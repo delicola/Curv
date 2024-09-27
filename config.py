@@ -9,6 +9,7 @@ config_args = {
         'infected_ratio': (0.1, '初始感染比例'),
         'plotremove':(True, '是否画拆解图'),
         'threshold_dismantling':(0.05, '网络拆解之后剩余节点比例'),
+        'drop_precent':(0.1, '删除负曲率的比例'),
         }}
 
 parser = argparse.ArgumentParser()
