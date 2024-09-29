@@ -99,7 +99,9 @@ def network_dismantling_plot(G, args):
 
 #path = './data/BA_{}.gml'.format(1003)
 # path = './data/BA_{}.gml'.format(100)
-path = './data/LFR_{}.gml'.format(200)
+# path = './data/LFR_{}.gml'.format(200)
+name = 'polbooks'  #football polbooks
+path = './data/real-world/{}/{}.gml'.format(name,name)
 
 G = nx.read_gml(path, destringizer = int, label='id')
 
