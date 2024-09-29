@@ -8,7 +8,7 @@ import pandas as pd
 import networkx as nx
 from config import parser
 
-methods = ['degree', 'curv', 'curv2']
+methods = ['degree', 'curv', 'curv2','PR']
 
 
 def generate_rank_list(G, args, methods = methods):
