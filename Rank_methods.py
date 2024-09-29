@@ -1,4 +1,7 @@
 import os
+
+import networkx as nx
+
 import tools
 from Pooling import GraphNet
 import torch
@@ -48,3 +51,11 @@ def rank_by_degree(G):
 
     return rank_list_degree
 
+def rank_by_PR(G):
+    pr = nx.pagerank(G)
+    rank_list_pr = tools.sortbydict(pr)
+    name = os.path.split(G.graph['path'])[1][0:-4]
+    n = list(pr.values())
+    m = [float('%.4f' % i) for i in n]
+    print("网络：{}, MI of PR: {}".format(name, tools.cal_MI(m)))
+    return rank_list_pr

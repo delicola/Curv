@@ -1,32 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="zj2024@180.209.64.11:6548 password (4)" remoteFilesAllowedToDisappearOnAutoupload="false">
+  <component name="PublishConfigData" autoUpload="Always" serverName="sshConfig://hobert@180.209.64.11:22 password/home/hobert/.conda/envs/gdm/bin/python" remoteFilesAllowedToDisappearOnAutoupload="false">
     <serverData>
-      <paths name="zj2024@180.209.64.11:6548 password">
+      <paths name="hobert@180.209.64.11:22">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="zj2024@180.209.64.11:6548 password (2)">
+      <paths name="hobert@180.209.64.11:22 password">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="zj2024@180.209.64.11:6548 password (3)">
+      <paths name="hobert@180.209.64.11:22 password (1)">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="zj2024@180.209.64.11:6548 password (4)">
+      <paths name="sshConfig://hobert@180.209.64.11:22 password/home/hobert/.conda/envs/gdm/bin/python">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/zj2024/code/Curv" local="$PROJECT_DIR$" />
+            <mapping deploy="/home/hobert/code/NEES-curv" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="sshConfig://hobert@180.209.64.11:22 password/home/hobert/.conda/envs/gdm/bin/python (1)">
+        <serverdata>
+          <mappings>
+            <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>

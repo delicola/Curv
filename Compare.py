@@ -47,6 +47,23 @@ def generate_rank_list(G, args, methods = methods):
                 time_sum = time_end - time_start
                 logger.info('{} 数据集,重新计算的curv方法生成节点排序列表的时间是：{}s'.format(datasetname, time_sum))
 
+    if 'PR' in methods:
+        try:
+            G.graph['rank_PR']
+        except KeyError:
+            time_start = time.time()
+            G.graph['rank_PR'] = rank_by_PR(G)
+            time_end = time.time()
+            time_sum = time_end - time_start
+            logger.info('{} 数据集,PR方法生成节点排序列表的时间是：{}s'.format(datasetname, time_sum))
+        finally:
+            if args.recalculate is True:
+                time_start = time.time()
+                G.graph['rank_PR'] = rank_by_PR(G)
+                time_end = time.time()
+                time_sum = time_end - time_start
+                logger.info('{} 数据集,重新计算的PR方法生成节点排序列表的时间是：{}s'.format(datasetname, time_sum))
+
 
 def network_dismantling_plot(G, args):
     datasetname = os.path.split(G.graph['path'])[1][0:-4]
