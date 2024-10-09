@@ -15,8 +15,9 @@ import torch.optim as optim
 def rank_by_curv(G, ep = 50, reverse = True):
 
     num_nodes = G.number_of_nodes()
-    feature = torch.eye(num_nodes, dtype=torch.float)
-    model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
+    feature = tools.generate_feature_matrix(G)
+    # feature = torch.eye(num_nodes, dtype=torch.float)
+    model = GraphNet(in_channels=4, hidden_channels=64, out_channels=32)
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
     for epoch in tqdm(range(ep)):
         t = time.time()

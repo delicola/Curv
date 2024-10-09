@@ -352,6 +352,79 @@ def drop_edge(edge_index, methods = 'neg', alpha = 0.5, verbose = 'INFO'):
 
     return edge_index
 
+# def feature_nodes(G):  # generate node features
+#     NODES_LIST = list(G.nodes)
+#
+#     # the number of its own degree centrality 返回一个数， 度中心性
+#     degree_dict = nx.degree_centrality(G)
+#     degree_list = np.array([degree_dict[i] for i in NODES_LIST])[:, None]
+#     degree_list_norm = degree_list / np.max(degree_list)
+#     degree_list_norm = degree_list_norm.reshape(degree_list_norm.shape[0])
+#     save_node_feature('degree_centrality_norm', degree_list_norm.tolist())
+#
+#
+#     # the number of its two-hop neighbors，返回一个数，二阶邻居的个数 局部特征
+#     second_neighbor = counts_high_order_nodes(self.G, depth=2)
+#     second_neighbor_list = np.array([second_neighbor[i] for i in NODES_LIST])[:, None]
+#     second_neighbor_list_norm = second_neighbor_list / np.max(second_neighbor_list)
+#     # second_neighbor_list_norm = second_neighbor_list_norm.reshape(second_neighbor_list_norm.shape[0])
+#     self.save_node_feature('second_neighbor_list_norm', second_neighbor_list_norm.tolist())
+#
+#     # average degree of its one-hop neighbors返回一个数，局部特征
+#     neighbor_average_degree = nx.average_neighbor_degree(self.G)
+#     neighbor_average_degree_list = np.array([neighbor_average_degree[i] for i in NODES_LIST])[:, None]
+#     neighbor_average_degree_list_norm = neighbor_average_degree_list / np.max(neighbor_average_degree_list)
+#     # neighbor_average_degree_list_norm = neighbor_average_degree_list_norm.reshape(neighbor_average_degree_list_norm.shape[0])
+#     self.save_node_feature('neighbor_average_degree_list_norm', neighbor_average_degree_list_norm.tolist())
+#
+#     # the number of its local clustering coefficient
+#     local_clustering_dict = nx.clustering(self.G)
+#     local_clustering_list = np.array([local_clustering_dict[i] for i in NODES_LIST])[:, None]
+#     # local_clustering_list = local_clustering_list.reshape(local_clustering_list.shape[0])
+#     self.save_node_feature('local_clustering_list', local_clustering_list.tolist())
+#
+#
+# def save_node_feature(self, feature_name, feature_list):
+#     for i in self.G:
+#         self.G.nodes[i][feature_name] = feature_list[i]
+
+def counts_high_order_nodes(G, depth=2):
+    NODES_LIST = list(G.nodes)
+    output = {}
+    output = output.fromkeys(NODES_LIST)
+    for node in NODES_LIST:
+        layers = dict(nx.bfs_successors(G, source=node, depth_limit=depth))
+        high_order_nodes = sum([len(i) for i in layers.values()])
+        output[node] = high_order_nodes
+    return output
+
+def generate_feature_matrix(G):
+    NODES_LIST = list(G.nodes)
+
+    # Calculate degree centrality and normalize
+    degree_dict = nx.degree_centrality(G)
+    degree_list = np.array([degree_dict[i] for i in NODES_LIST])
+    degree_list_norm = degree_list / np.max(degree_list)
+
+    # Calculate the number of two-hop neighbors and normalize
+    second_neighbor = counts_high_order_nodes(G, depth=2)
+    second_neighbor_list = np.array([second_neighbor[i] for i in NODES_LIST])
+    second_neighbor_list_norm = second_neighbor_list / np.max(second_neighbor_list)
+
+    # Calculate average degree of one-hop neighbors and normalize
+    neighbor_average_degree = nx.average_neighbor_degree(G)
+    neighbor_average_degree_list = np.array([neighbor_average_degree[i] for i in NODES_LIST])
+    neighbor_average_degree_list_norm = neighbor_average_degree_list / np.max(neighbor_average_degree_list)
+
+    # Calculate local clustering coefficient
+    local_clustering_dict = nx.clustering(G)
+    local_clustering_list = np.array([local_clustering_dict[i] for i in NODES_LIST])
+
+    # Combine the four features into a feature matrix
+    feature_matrix = np.stack((degree_list_norm, second_neighbor_list_norm, neighbor_average_degree_list_norm, local_clustering_list), axis=-1)
+
+    return torch.from_numpy(feature_matrix).float()
+
 # def trans_edgeindex(edge_index):#将edge_index的第二维全都改成end
 
 # def add_self_loop(G):
@@ -368,7 +441,12 @@ def drop_edge(edge_index, methods = 'neg', alpha = 0.5, verbose = 'INFO'):
 #
 # G = nx.connected_caveman_graph(5,50)
 # print(cal_modularity(G))
-
+path = './data/BA_{}.gml'.format(100_3)
+G = nx.read_gml(path, destringizer = int, label='id')
+x = generate_feature_matrix(G)
+print(x)
+feature = torch.eye(100, dtype=torch.float)
+print(feature)
 # datasetname = 'com-dblp'  # cora com-dblp karate dolphins football  email-Eu-core infect-dublin
 # dataset = './data/real-world/{}/{}'.format(datasetname,datasetname)  #LFR_100_0  barabasi_albert_200_16  GN1000 caveman_250
 # # dataset = './data/synthetic/caveman_250'  #LFR_100_0  barabasi_albert_200_16  GN1000 caveman_250

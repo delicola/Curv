@@ -1,3 +1,5 @@
+#这里面的初始feature不是onehot编码，
+
 from collections import defaultdict, namedtuple
 from typing import Optional, Callable, Union
 
@@ -380,6 +382,8 @@ class GraphNet(nn.Module):
         return x1, new_edge_index2, loss1+loss2, rank_dict
 
 
+
+
 # 示例用法
 #G = nx.karate_club_graph()
 # G = nx.barabasi_albert_graph(100, 3)
@@ -393,11 +397,10 @@ G = nx.read_gml(path, destringizer = int, label='id')
 #
 num_nodes = G.number_of_nodes()
 # 生成独热编码的特征矩阵
-# feature = torch.eye(num_nodes, dtype=torch.float)
-feature = tools.generate_feature_matrix(G)
+feature = torch.eye(num_nodes, dtype=torch.float)
 
 # 创建模型并运行前向传播
-model = GraphNet(in_channels=4, hidden_channels=64, out_channels=32)
+model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
 #out, updated_edge_index, unpool_info1, cluster1, fitness1, loss1 = model(G, feature)
 out, updated_edge_index, loss3, rank_dict = model(G, feature)
 print(out.shape)  # 输出的特征矩阵形状
