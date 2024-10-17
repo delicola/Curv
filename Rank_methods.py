@@ -3,20 +3,25 @@ import os
 import networkx as nx
 
 import tools
-from Pooling import GraphNet
+from Pooling4 import GraphNet
 import torch
 import time
 import copy
 from tqdm import tqdm
+from CI.python_inferrence import collective_influence_l
 
 import torch.optim as optim
 
+from config import parser
+args = parser.parse_args()
 
-def rank_by_curv(G, ep = 50, reverse = True):
+
+def rank_by_curv(G, ep = args.epoch, reverse = True):
 
     num_nodes = G.number_of_nodes()
     feature = tools.generate_feature_matrix(G)
     # feature = torch.eye(num_nodes, dtype=torch.float)
+    # model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
     model = GraphNet(in_channels=4, hidden_channels=64, out_channels=32)
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
     for epoch in tqdm(range(ep)):
@@ -28,7 +33,7 @@ def rank_by_curv(G, ep = 50, reverse = True):
         optimizer.zero_grad()
         loss3.backward()
         optimizer.step()
-        print(loss3)
+        # print(loss3)
     # out, updated_edge_index, loss3, rank_dict = model(G, feature)
     print(rank_dict)
     rank =tools.sortbydict(rank_dict, reverse=reverse)
@@ -60,3 +65,7 @@ def rank_by_PR(G):
     m = [float('%.4f' % i) for i in n]
     print("网络：{}, MI of PR: {}".format(name, tools.cal_MI(m)))
     return rank_list_pr
+
+def rank_by_CI(G,l=1):
+    nodes = collective_influence_l(G,l)
+    return nodes

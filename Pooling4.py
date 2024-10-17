@@ -15,10 +15,13 @@ from torch_geometric.nn import GCNConv, MessagePassing, GATConv
 from GraphRicciCurvature.OllivierRicci import OllivierRicci
 from torch_geometric.utils import from_networkx, add_remaining_self_loops, softmax
 from torch_sparse import coalesce
+
+
 from tools import edgeIndex
 import tools
 from Pooling1 import RicciCurvaturePooling1
-
+from config import parser
+args = parser.parse_args()
 
 
 class simiConv(MessagePassing):  # self.gnn_score = simiConv(self.in_channels, 1)
@@ -193,7 +196,7 @@ class RicciCurvaturePooling(nn.Module):
             remaining_score = x.new_ones(
                 (new_x.size(0) - len(new_node_indices),))
             new_score = torch.cat([new_score, remaining_score]) #所有社团新的得分，多个节点的社团是原来的得分，单个节点的社团是1
-        new_x = new_x * new_score.view(-1, 1)
+        # new_x = new_x * new_score.view(-1, 1)
         N = new_x.size(0)
         #todo
         #不需要社团之间的连边
@@ -315,7 +318,8 @@ class RicciCurvaturePooling(nn.Module):
 class GraphNet(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(GraphNet, self).__init__()
-        self.conv1 = GCNConv(in_channels, hidden_channels)
+        self.fc = Linear(in_channels, 16)
+        self.conv1 = GCNConv(16, hidden_channels)
         #self.conv2 = GCNConv(hidden_channels, hidden_channels)
         self.conv3 = GCNConv(hidden_channels, out_channels)
         self.conv4 = GATConv(out_channels, out_channels)
@@ -351,6 +355,7 @@ class GraphNet(nn.Module):
         #TODU
         # print(edge_index.shape)
         # 第一层卷积
+        x = F.relu(self.fc(x))
         x = F.relu(self.conv1(x, edge_index))
 
         # 第二层卷积
@@ -384,31 +389,31 @@ class GraphNet(nn.Module):
 
 
 
-# 示例用法
-#G = nx.karate_club_graph()
-# G = nx.barabasi_albert_graph(100, 3)
-path = './data/BA_{}.gml'.format(100_3)
-# G.remove_nodes_from(list(nx.isolates(G)))
-# G.remove_edges_from(nx.selfloop_edges(G))
-# G.graph['path'] = path
-# tools.save_graph_gml(G)
-
-G = nx.read_gml(path, destringizer = int, label='id')
+# # 示例用法
+# #G = nx.karate_club_graph()
+# # G = nx.barabasi_albert_graph(100, 3)
+# path = './data/BA_{}.gml'.format(100_3)
+# # G.remove_nodes_from(list(nx.isolates(G)))
+# # G.remove_edges_from(nx.selfloop_edges(G))
+# # G.graph['path'] = path
+# # tools.save_graph_gml(G)
 #
-num_nodes = G.number_of_nodes()
-# 生成独热编码的特征矩阵
-feature = torch.eye(num_nodes, dtype=torch.float)
-
-# 创建模型并运行前向传播
-model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
-#out, updated_edge_index, unpool_info1, cluster1, fitness1, loss1 = model(G, feature)
-out, updated_edge_index, loss3, rank_dict = model(G, feature)
-print(out.shape)  # 输出的特征矩阵形状
-print(out)  # 输出的特征矩阵
-print(updated_edge_index)  # 输出更新后的边索引
-#print(updated_edge_index.shape)
-#print(unpool_info1)  # 输出池化信息
-#print(cluster1) # 输出 cluster 信息
-#print(fitness1)  # 输出 fitness 信息
-print(loss3)  # 输出 loss 信息
-print(rank_dict)  # 输出 rank_dict 信息
+# G = nx.read_gml(path, destringizer = int, label='id')
+# #
+# num_nodes = G.number_of_nodes()
+# # 生成独热编码的特征矩阵
+# feature = torch.eye(num_nodes, dtype=torch.float)
+#
+# # 创建模型并运行前向传播
+# model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
+# #out, updated_edge_index, unpool_info1, cluster1, fitness1, loss1 = model(G, feature)
+# out, updated_edge_index, loss3, rank_dict = model(G, feature)
+# print(out.shape)  # 输出的特征矩阵形状
+# print(out)  # 输出的特征矩阵
+# print(updated_edge_index)  # 输出更新后的边索引
+# #print(updated_edge_index.shape)
+# #print(unpool_info1)  # 输出池化信息
+# #print(cluster1) # 输出 cluster 信息
+# #print(fitness1)  # 输出 fitness 信息
+# print(loss3)  # 输出 loss 信息
+# print(rank_dict)  # 输出 rank_dict 信息

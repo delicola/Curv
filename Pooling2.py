@@ -41,7 +41,7 @@ class simiConv(MessagePassing):  # self.gnn_score = simiConv(self.in_channels, 1
 
     def message(self, x_i, x_j, x_cluster_i):
         out = torch.cosine_similarity(x_i, x_j).reshape(-1, 1)  #获得节点相似性方法可以换，x_i表i节点本身，x_j表i节点得邻居
-        print(x_i.shape, out.shape)
+        # print(x_i.shape, out.shape)
         return x_cluster_i * out  #这里就是公式8，x_cluster_i就是i节点的x_cluster，out是eij
         # return  out
 
@@ -243,7 +243,7 @@ class RicciCurvaturePooling2(nn.Module):
         if self.GNN is not None:
             print("GNN")
             x_pool_j = self.gnn_intra_cluster(x=x, edge_index=edge_index)  # 这里用了自注意力gnn对x处理
-        print("x_pool", x_pool.size())
+        # print("x_pool", x_pool.size())
 
         if self.use_attention:
             x_pool_j = torch.matmul(x_pool_j, self.weight)

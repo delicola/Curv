@@ -1,3 +1,5 @@
+#这里面的初始feature不是onehot编码，同时增加删边的层
+
 from collections import defaultdict, namedtuple
 from typing import Optional, Callable, Union
 
@@ -19,7 +21,6 @@ from Pooling1 import RicciCurvaturePooling1
 
 from config import parser
 args = parser.parse_args()
-
 
 
 class simiConv(MessagePassing):  # self.gnn_score = simiConv(self.in_channels, 1)
@@ -316,14 +317,17 @@ class RicciCurvaturePooling(nn.Module):
 class GraphNet(nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels):
         super(GraphNet, self).__init__()
-        self.conv1 = GCNConv(in_channels, hidden_channels)
+        self.fc = Linear(in_channels, 16)
+        self.conv1 = GCNConv(16, hidden_channels)
         #self.conv2 = GCNConv(hidden_channels, hidden_channels)
         self.conv3 = GCNConv(hidden_channels, out_channels)
         self.conv4 = GATConv(out_channels, out_channels)
+        self.conv5 = GATConv(out_channels, out_channels)
         #self.conv4 = GATConv(out_channels, out_channels, heads=6, dropout=0.6)
         self.pool1 = RicciCurvaturePooling(alpha=0.5, in_channels=out_channels)
         #self.pool2 = RicciCurvaturePooling(alpha=0.5, in_channels=out_channels*6)
         self.pool2 = RicciCurvaturePooling(alpha=0.5, in_channels=out_channels)
+        self.pool3 = RicciCurvaturePooling(alpha=0.5, in_channels=out_channels)
         #self.lin = Linear(out_channels, 1)
         #self.final_score = simiConv(out_channels*6, 1)
         self.final_score = simiConv(out_channels, 1)
@@ -352,6 +356,7 @@ class GraphNet(nn.Module):
         #TODU
         # print(edge_index.shape)
         # 第一层卷积
+        x = F.relu(self.fc(x))
         x = F.relu(self.conv1(x, edge_index))
 
         # 第二层卷积
@@ -364,8 +369,11 @@ class GraphNet(nn.Module):
         x = F.relu(self.conv4(x_pool1, edge_index))
 
         x_pool2, new_edge_index2, fitness2, loss2 = self.pool2(x, drop_edge_index, edge_index)
+        drop_edge_index = tools.drop_edge(drop_edge_index, methods='neg')
+        x = F.relu(self.conv5(x_pool2, edge_index))
+        x_pool3, new_edge_index3, fitness3, loss3 = self.pool3(x, drop_edge_index, edge_index)
 
-        x1 = self.final_score(x_pool2, edge_index)
+        x1 = self.final_score(x_pool3, edge_index)
         #x_pool2, new_edge_index2, fitness2, loss2 = self.pool2(x_pool1, new_edge_index1, edge_index)
         #x_pool3, new_edge_index3, fitness3, loss3 = self.pool3(x_pool2, new_edge_index2, edge_index)
         #x, new_edge_index1, unpool_info, cluster, fitness, loss = self.pool(x, edge_index)
@@ -383,6 +391,8 @@ class GraphNet(nn.Module):
         return x1, new_edge_index2, loss1+loss2, rank_dict
 
 
+
+
 # 示例用法
 #G = nx.karate_club_graph()
 # G = nx.barabasi_albert_graph(100, 3)
@@ -396,11 +406,10 @@ G = nx.read_gml(path, destringizer = int, label='id')
 #
 num_nodes = G.number_of_nodes()
 # 生成独热编码的特征矩阵
-# feature = torch.eye(num_nodes, dtype=torch.float)
-feature = tools.generate_feature_matrix(G)
+feature = torch.eye(num_nodes, dtype=torch.float)
 
 # 创建模型并运行前向传播
-model = GraphNet(in_channels=4, hidden_channels=64, out_channels=32)
+model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
 #out, updated_edge_index, unpool_info1, cluster1, fitness1, loss1 = model(G, feature)
 out, updated_edge_index, loss3, rank_dict = model(G, feature)
 print(out.shape)  # 输出的特征矩阵形状

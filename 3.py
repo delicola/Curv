@@ -246,7 +246,7 @@ class RicciCurvaturePooling(nn.Module):
         if self.GNN is not None:
             print("GNN")
             x_pool_j = self.gnn_intra_cluster(x=x, edge_index=edge_index)  # 这里用了自注意力gnn对x处理
-        print("x_pool", x_pool.size())
+        # print("x_pool", x_pool.size())
 
         if self.use_attention:
             x_pool_j = torch.matmul(x_pool_j, self.weight)

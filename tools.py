@@ -13,9 +13,10 @@ import torch
 # from config import parser
 from collections import Counter
 
+from config import parser
+args = parser.parse_args()
 
 
-# args = parser.parse_args()
 
 def sortbydict(dict, reverse = True):
     remove = sorted(dict.items(), key=lambda x: x[1], reverse=reverse)
@@ -145,51 +146,7 @@ def return_index(list, threshold = 0.01): #返回列表小于阈值所对应的i
             a += 1
     return a
 
-def add_flags_from_config(parser, config_dict):
-    """
-    Adds a flag (and default value) to an ArgumentParser for each parameter in a config
-    """
 
-    def OrNone(default):
-        def func(x):
-            # Convert "none" to proper None object
-            if x.lower() == "none":
-                return None
-            # If default is None (and x is not None), return x without conversion as str
-            elif default is None:
-                return str(x)
-            # Otherwise, default has non-None type; convert x to that type
-            else:
-                return type(default)(x)
-
-        return func
-
-    for param in config_dict:
-        default, description = config_dict[param]
-        try:
-            if isinstance(default, dict):
-                parser = add_flags_from_config(parser, default)
-            elif isinstance(default, list):
-                if len(default) > 0:
-                    # pass a list as argument
-                    parser.add_argument(
-                            f"--{param}",
-                            action="append",
-                            type=type(default[0]),
-                            default=default,
-                            help=description
-                    )
-                else:
-                    pass
-                    parser.add_argument(f"--{param}", action="append", default=default, help=description)
-            else:
-                pass
-                parser.add_argument(f"--{param}", type=OrNone(default), default=default, help=description)
-        except argparse.ArgumentError:
-            print(
-                f"Could not add flag for param {param} because it was already present."
-            )
-    return parser
 
 def cal_modularity(G):
     m = nx.community.modularity(G, nx.community.label_propagation_communities(G))
@@ -326,10 +283,11 @@ def drop_edge(edge_index, methods = 'neg', alpha = 0.5, verbose = 'INFO'):
             edge_pos.append(i)
         else:
             edge_zero.append(i)
-    if methods == 'neg':
+    if methods == 'neg': #删除固定负曲率的边
         edge_rc_list_sorted = sorted(edge_rc_list, key=lambda x: x[2])
         # num_edges_to_remove = int(len(edge_rc_list_sorted) * args.drop_percent)
-        num_edges_to_remove = int(len(edge_rc_list_sorted) * 0.40)
+        num_edges_to_remove = int(len(edge_neg) * args.drop_percent)
+        # num_edges_to_remove = int(len(edge_rc_list_sorted) * 0.40)
         edges_to_remove = edge_rc_list_sorted[:num_edges_to_remove]
         for edge in edges_to_remove:
             G.remove_edge(edge[0], edge[1])
@@ -339,7 +297,7 @@ def drop_edge(edge_index, methods = 'neg', alpha = 0.5, verbose = 'INFO'):
                 G.remove_edge(edge_rc_list[i][0], edge_rc_list[i][1])
     elif methods == 'drop_percent':
         edge_rc_list_sorted = sorted(edge_rc_list, key=lambda x: x[2])
-        num_edges_to_remove = int(len(edge_rc_list_sorted) * 0.30)
+        num_edges_to_remove = int(len(edge_rc_list_sorted) * 0.10)
         edges_to_remove = edge_rc_list_sorted[:num_edges_to_remove]
         for edge in edges_to_remove:
             G.remove_edge(edge[0], edge[1])
@@ -349,6 +307,7 @@ def drop_edge(edge_index, methods = 'neg', alpha = 0.5, verbose = 'INFO'):
     print('负曲率边数{}'.format(len(edge_neg)))
     print('正曲率边数{}'.format(len(edge_pos)))
     print('零曲率边数{}'.format(len(edge_zero)))
+    print('删除的边数{}'.format(num_edges_to_remove))
 
     return edge_index
 
@@ -420,10 +379,18 @@ def generate_feature_matrix(G):
     local_clustering_dict = nx.clustering(G)
     local_clustering_list = np.array([local_clustering_dict[i] for i in NODES_LIST])
 
+    #Calculate PR value
+    pr = nx.pagerank(G)
+    pr_list = np.array([pr[i] for i in NODES_LIST])
+    # pr_norm = pr_list / np.max(pr_list)
+
+
     # Combine the four features into a feature matrix
-    feature_matrix = np.stack((degree_list_norm, second_neighbor_list_norm, neighbor_average_degree_list_norm, local_clustering_list), axis=-1)
+    feature_matrix = np.stack((degree_list_norm, second_neighbor_list_norm, pr_list, neighbor_average_degree_list_norm), axis=-1)
 
     return torch.from_numpy(feature_matrix).float()
+
+
 
 # def trans_edgeindex(edge_index):#将edge_index的第二维全都改成end
 
@@ -441,12 +408,12 @@ def generate_feature_matrix(G):
 #
 # G = nx.connected_caveman_graph(5,50)
 # print(cal_modularity(G))
-path = './data/BA_{}.gml'.format(100_3)
-G = nx.read_gml(path, destringizer = int, label='id')
-x = generate_feature_matrix(G)
-print(x)
-feature = torch.eye(100, dtype=torch.float)
-print(feature)
+# path = './data/BA_{}.gml'.format(100_3)
+# G = nx.read_gml(path, destringizer = int, label='id')
+# x = generate_feature_matrix(G)
+# print(x)
+# feature = torch.eye(100, dtype=torch.float)
+# print(feature)
 # datasetname = 'com-dblp'  # cora com-dblp karate dolphins football  email-Eu-core infect-dublin
 # dataset = './data/real-world/{}/{}'.format(datasetname,datasetname)  #LFR_100_0  barabasi_albert_200_16  GN1000 caveman_250
 # # dataset = './data/synthetic/caveman_250'  #LFR_100_0  barabasi_albert_200_16  GN1000 caveman_250
