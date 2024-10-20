@@ -1,10 +1,12 @@
 import argparse
 import tools
-
+import random
 nettype = 'real-world'
 # nettype = 'synthetic'
-name = 'polbooks'
-
+name = 'football'
+#seed = random.randint(0, 1000)
+seed = 311
+print(seed)
 def add_flags_from_config(parser, config_dict):
     """
     Adds a flag (and default value) to an ArgumentParser for each parameter in a config
@@ -60,11 +62,11 @@ config_args = {
         'plotremove':(True, '是否画拆解图'),
         'threshold_dismantling':(0.05, '网络拆解之后剩余节点比例'),
         'drop_percent':(0.2, '删除负曲率边的比例'),
-        'epoch':(100, '训练的epoch'),
+        'epoch':(20, '训练的epoch'),
         'nettype':('real-world', '网络类型'),
         'name':(name, '网络名称'),
         'dataset_path':('./data/{}/{}/{}.gml'.format(nettype,name,name), '数据集位置'),
-        'seed':(280, '随机种子'),
+        'seed':(seed, '随机种子'),
         'savegraph':(True, '是否保存图'),
         'show':(True, '是否展示图'),
         }}

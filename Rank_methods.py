@@ -19,7 +19,7 @@ args = parser.parse_args()
 def rank_by_curv(G, ep = args.epoch, reverse = True):
 
     num_nodes = G.number_of_nodes()
-    # feature = tools.generate_feature_matrix(G)
+    #feature = tools.generate_feature_matrix(G)
     feature = torch.eye(num_nodes, dtype=torch.float)
     model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
     # model = GraphNet(in_channels=4, hidden_channels=64, out_channels=32)
@@ -68,4 +68,9 @@ def rank_by_PR(G):
 
 def rank_by_CI(G,l=1):
     nodes = collective_influence_l(G,l)
+    print("CI:",nodes)
+    # nodes = [5, 10, 7, 11, 6, 14, 0, 2, 3, 16, 4, 12, 1, 8, 9, 13, 15]
     return nodes
+
+# def rank_by_MY(G):
+#     666

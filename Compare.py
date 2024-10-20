@@ -1,6 +1,6 @@
 import os
 import time
-from Rank_methods import rank_by_curv, rank_by_degree, rank_by_PR
+from Rank_methods import rank_by_curv, rank_by_degree, rank_by_PR, rank_by_CI
 import tools
 from loguru import logger
 import matplotlib.pyplot as plt
@@ -67,6 +67,23 @@ def generate_rank_list(G, args, methods):
                 time_sum = time_end - time_start
                 logger.info('{} 数据集,重新计算的PR方法生成节点排序列表的时间是：{}s'.format(datasetname, time_sum))
 
+    if 'CI' in methods:
+        try:
+            G.graph['rank_CI']
+        except KeyError:
+            time_start = time.time()
+            G.graph['rank_CI'] = rank_by_CI(G)
+            time_end = time.time()
+            time_sum = time_end - time_start
+            logger.info('{} 数据集,CI方法生成节点排序列表的时间是：{}s'.format(datasetname, time_sum))
+        finally:
+            if args.recalculate is True:
+                time_start = time.time()
+                G.graph['rank_CI'] = rank_by_CI(G)
+                time_end = time.time()
+                time_sum = time_end - time_start
+                logger.info('{} 数据集,重新计算的CI方法生成节点排序列表的时间是：{}s'.format(datasetname, time_sum))
+
 
 def network_dismantling_plot(G, args):
     datasetname = os.path.split(G.graph['path'])[1][0:-4]
@@ -119,10 +136,26 @@ def network_dismantling_plot(G, args):
 # path = './data/LFR_{}.gml'.format(200)
 # name = 'polbooks'  #football polbooks
 # path = './data/real-world/{}/{}.gml'.format(name,name)
-
+    if 'PR' in methods:
+        try:
+            G.graph['rank_PR']
+        except KeyError:
+            time_start = time.time()
+            G.graph['rank_PR'] = rank_by_PR(G)
+            time_end = time.time()
+            time_sum = time_end - time_start
+            logger.info('{} 数据集,PR方法生成节点排序列表的时间是：{}s'.format(datasetname, time_sum))
+        finally:
+            if args.recalculate is True:
+                time_start = time.time()
+                G.graph['rank_PR'] = rank_by_PR(G)
+                time_end = time.time()
+                time_sum = time_end - time_start
+                logger.info('{} 数据集,重新计算的PR方法生成节点排序列表的时间是：{}s'.format(datasetname, time_sum))
 if __name__ == '__main__':
-    # methods = ['degree', 'curv', 'curv2', 'PR', 'CI']
-    methods = ['degree', 'curv', 'curv2', 'PR']
+    methods = ['degree', 'curv', 'curv2', 'PR', 'CI']
+    # methods = ['degree', 'curv', 'curv2', 'PR']
+    #methods = ['degree', 'PR']
     args = parser.parse_args()
     seed_value = args.seed  # 设定随机数种子
 
@@ -144,12 +177,28 @@ if __name__ == '__main__':
 
     # G = nx.read_gml(path, destringizer = int, label='id')
 
-    edges = [
-        (0, 1), (0, 5), (1, 5), (2, 3), (2, 6), (2, 7), (3, 7), (3, 8),
-        (4, 5), (4, 9), (5, 6), (5, 9), (5, 10), (6, 7), (6, 12),
-        (6, 10), (7, 8), (7, 12), (10, 11), (10, 16), (10, 14), (10, 15),
-        (11, 12), (11, 16), (13, 14)
+    # edges = [
+    #     (0, 1), (0, 5), (1, 5), (2, 3), (2, 6), (2, 7), (3, 7), (3, 8),
+    #     (4, 5), (4, 9), (5, 6), (5, 9), (5, 10), (6, 7), (6, 12),
+    #     (6, 10), (7, 8), (7, 12), (10, 11), (10, 16), (10, 14), (10, 15),
+    #     (11, 12), (11, 15), (11, 16), (13, 14), (15, 16)
+    # ]
+
+    edges_old = [
+        (1, 2), (1, 3), (2, 1), (2, 3), (2, 5),
+        (3, 1), (3, 2), (3, 4), (4, 3), (4, 5),
+        (4, 8), (4, 9), (5, 2), (5, 4), (5, 6),
+        (6, 5), (6, 7), (7, 6), (7, 8), (8, 4),
+        (8, 7), (9, 4), (9, 10), (9, 12), (9, 13),
+        (10, 9), (10, 11), (11, 10), (12, 9), (13, 9),
+        (13, 14), (14, 13), (14, 15), (14, 16), (15, 14),
+        (16, 14)
     ]
+
+    # 将边直接转换为从0开始编号
+    edges = [(u - 1, v - 1) for u, v in edges_old]
+
+
     G = nx.Graph()
     G.add_edges_from(edges)
     G.graph['path'] = './my.gml'

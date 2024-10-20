@@ -1,3 +1,4 @@
+#从pooling而来，减少相乘的参数，社团的特征值为取平均
 from collections import defaultdict, namedtuple
 from typing import Optional, Callable, Union
 
@@ -75,6 +76,7 @@ class RicciCurvaturePooling(nn.Module):
         self.add_self_loops = add_self_loops
         self.heads = 6
         self.weight = Parameter(torch.Tensor(in_channels, self.heads * in_channels))
+        self.weight2 = Parameter(torch.Tensor(in_channels, self.heads * in_channels))
         self.attention = Parameter(torch.Tensor(1, self.heads, 2 * in_channels))
         self.use_attention = True
 
@@ -86,8 +88,6 @@ class RicciCurvaturePooling(nn.Module):
         self.marginloss = nn.MarginRankingLoss(0.5)
         self.BCEWloss = nn.BCEWithLogitsLoss()
         self.CosineLoss = nn.CosineEmbeddingLoss(margin=0.2)
-        self.GCN = GCNConv(self.in_channels, self.in_channels,
-                                         **kwargs)
         if self.GNN is not None:
             self.gnn_intra_cluster = GNN(self.in_channels, self.in_channels,
                                          **kwargs)
@@ -103,6 +103,7 @@ class RicciCurvaturePooling(nn.Module):
         self.att.reset_parameters()
         self.gnn_score.reset_parameters()
         self.glorot(self.weight)
+        self.glorot(self.weight2)
         self.glorot(self.attention)
         if self.GNN is not None:
             self.gnn_intra_cluster.reset_parameters()
@@ -171,9 +172,9 @@ class RicciCurvaturePooling(nn.Module):
             new_node_indices.append(node_idx)
             for j in source:
                 cluster[j] = i  #记录哪些节点j被融合到新社团序号i中
-                if j != node_idx:
-                    tar_in.append(j)
-                    tar_tar.append(i)
+                # if j != node_idx:
+                tar_in.append(j)
+                tar_tar.append(i)
 
             nodes_remaining = [j for j in nodes_remaining if j not in source]
 
@@ -186,16 +187,53 @@ class RicciCurvaturePooling(nn.Module):
 
         #cluster = cluster.to(torch.device('cuda'))
         # cluster = cluster.to(x.device)
+
+        #x_i = x_pool_j[subindex[0]]
+        #x = scatter(x_i, subindex[1], dim=0, reduce='mean')
+
+
+        #拼接tar_in和tar_tar
+        tar = torch.cat([torch.tensor(tar_in).reshape(1, -1), torch.tensor(tar_tar).reshape(1, -1)], dim=0)
+        # x_she = x_pool[tar[0]]
+        # x_zhong= scatter(x_she, tar[1], dim=0, reduce='max')
+        # xx = 0
+        # for i in new_node_indices:
+        #     x[i] = x_zhong[xx]
+        #     xx += 1
+
+        x_pool_j = torch.matmul(x_pool, self.weight2)
+
+        x_pool_j = x_pool_j.view(-1, self.heads, self.in_channels)
+
+        x_i = x_pool_j[tar[0]]  # 保存原来邻居的特征向量xj
+
+        x_j = scatter(x_i, tar[1], dim=0, reduce='max')  # 虚拟合并节点xmi向量
+
+        alpha = (torch.cat([x_i, x_j[tar[1]]], dim=-1) * self.attention).sum(dim=-1)  # 对应公式4向量拼接部分
+
+        alpha = F.leaky_relu(alpha, self.negative_slope)  # self.negative_slope=0.2
+        alpha = softmax(alpha, tar[1], num_nodes=x_pool_j.size(0))
+        alpha = F.dropout(alpha, p=self.dropout, training=self.training)
+
+        v_j = x_pool_j[tar[0]] * alpha.view(-1, self.heads, 1)
+
+        x_she = scatter(v_j, tar[1], dim=0, reduce='add')
+
+        x_she = x_she.mean(dim=1)  # 就是h向量社团特征
+        xx = 0
+        for i in new_node_indices:
+            x[i] = x_she[xx]
+            xx += 1
         index = new_node_indices + nodes_remaining  #融合后还有哪些节点
         new_x_pool = x_pool[index, :] #x_pool是所有原始节点的特征向量，new_x_pool是按照排序得到的节点的特征向量
         new_x = torch.cat([x[new_node_indices, :], x_pool[nodes_remaining, :]]) #所有社团的特征
-        new_score = score[new_node_indices]
-        if len(nodes_remaining) > 0:
-            remaining_score = x.new_ones(
-                (new_x.size(0) - len(new_node_indices),))
-            new_score = torch.cat([new_score, remaining_score]) #所有社团新的得分，多个节点的社团是原来的得分，单个节点的社团是1
-        new_x = new_x * new_score.view(-1, 1)
-        N = new_x.size(0)
+        #new_score = score[new_node_indices]
+        # if len(nodes_remaining) > 0:
+        #     remaining_score = x.new_ones(
+        #         (new_x.size(0) - len(new_node_indices),))
+        #     new_score = torch.cat([new_score, remaining_score]) #所有社团新的得分，多个节点的社团是原来的得分，单个节点的社团是1
+        #new_x = new_x * new_score.view(-1, 1)
+        #N = new_x.size(0)
         #todo
         #不需要社团之间的连边
         # new_edge_index, _ = coalesce(cluster[edge_index], None, N, N)  #用聚类中的序号替换原来的节点索引序号，得到的是社团之间的连接关系
@@ -277,7 +315,8 @@ class RicciCurvaturePooling(nn.Module):
             # print("GNN")
             x_pool_j = self.gnn_intra_cluster(x=x, edge_index=edge_index)  # 这里用了自注意力gnn对x处理
         # print("x_pool", x_pool.size())
-
+        x_i = x_pool_j[subindex[0]]
+        x = scatter(x_i, subindex[1], dim=0, reduce='max')
         if self.use_attention: #这里面将subindex全都改成edgeindex
             x_pool_j = torch.matmul(x_pool_j, self.weight)
 
@@ -330,7 +369,7 @@ class GraphNet(nn.Module):
         self.pool1 = RicciCurvaturePooling(alpha=0.5, in_channels=out_channels)
         #self.pool2 = RicciCurvaturePooling(alpha=0.5, in_channels=out_channels*6)
         self.pool2 = RicciCurvaturePooling(alpha=0.5, in_channels=out_channels)
-        self.lin = Linear(out_channels, 1)
+        #self.lin = Linear(out_channels, 1)
         #self.final_score = simiConv(out_channels*6, 1)
         self.final_score = simiConv(out_channels, 1)
 
