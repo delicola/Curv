@@ -1,4 +1,4 @@
-#这里面的初始feature不是onehot编码，
+#这里面的初始feature不是onehot编码，第一层紧跟了一个全连接层，而不是GCN
 
 from collections import defaultdict, namedtuple
 from typing import Optional, Callable, Union

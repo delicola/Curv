@@ -383,32 +383,32 @@ class GraphNet(nn.Module):
         return x1, new_edge_index2, loss1+loss2, rank_dict
 
 
-# 示例用法
-#G = nx.karate_club_graph()
-# G = nx.barabasi_albert_graph(100, 3)
-path = './data/BA_{}.gml'.format(100_3)
-# G.remove_nodes_from(list(nx.isolates(G)))
-# G.remove_edges_from(nx.selfloop_edges(G))
-# G.graph['path'] = path
-# tools.save_graph_gml(G)
-
-G = nx.read_gml(path, destringizer = int, label='id')
+# # 示例用法
+# #G = nx.karate_club_graph()
+# # G = nx.barabasi_albert_graph(100, 3)
+# path = './data/BA_{}.gml'.format(100_3)
+# # G.remove_nodes_from(list(nx.isolates(G)))
+# # G.remove_edges_from(nx.selfloop_edges(G))
+# # G.graph['path'] = path
+# # tools.save_graph_gml(G)
 #
-num_nodes = G.number_of_nodes()
-# 生成独热编码的特征矩阵
-# feature = torch.eye(num_nodes, dtype=torch.float)
-feature = tools.generate_feature_matrix(G)
-
-# 创建模型并运行前向传播
-model = GraphNet(in_channels=4, hidden_channels=64, out_channels=32)
-#out, updated_edge_index, unpool_info1, cluster1, fitness1, loss1 = model(G, feature)
-out, updated_edge_index, loss3, rank_dict = model(G, feature)
-print(out.shape)  # 输出的特征矩阵形状
-print(out)  # 输出的特征矩阵
-print(updated_edge_index)  # 输出更新后的边索引
-#print(updated_edge_index.shape)
-#print(unpool_info1)  # 输出池化信息
-#print(cluster1) # 输出 cluster 信息
-#print(fitness1)  # 输出 fitness 信息
-print(loss3)  # 输出 loss 信息
-print(rank_dict)  # 输出 rank_dict 信息
+# G = nx.read_gml(path, destringizer = int, label='id')
+# #
+# num_nodes = G.number_of_nodes()
+# # 生成独热编码的特征矩阵
+# # feature = torch.eye(num_nodes, dtype=torch.float)
+# feature = tools.generate_feature_matrix(G)
+#
+# # 创建模型并运行前向传播
+# model = GraphNet(in_channels=4, hidden_channels=64, out_channels=32)
+# #out, updated_edge_index, unpool_info1, cluster1, fitness1, loss1 = model(G, feature)
+# out, updated_edge_index, loss3, rank_dict = model(G, feature)
+# print(out.shape)  # 输出的特征矩阵形状
+# print(out)  # 输出的特征矩阵
+# print(updated_edge_index)  # 输出更新后的边索引
+# #print(updated_edge_index.shape)
+# #print(unpool_info1)  # 输出池化信息
+# #print(cluster1) # 输出 cluster 信息
+# #print(fitness1)  # 输出 fitness 信息
+# print(loss3)  # 输出 loss 信息
+# print(rank_dict)  # 输出 rank_dict 信息

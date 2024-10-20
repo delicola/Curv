@@ -121,7 +121,8 @@ def network_dismantling_plot(G, args):
 # path = './data/real-world/{}/{}.gml'.format(name,name)
 
 if __name__ == '__main__':
-    methods = ['degree', 'curv', 'curv2', 'PR', 'CI']
+    # methods = ['degree', 'curv', 'curv2', 'PR', 'CI']
+    methods = ['degree', 'curv', 'curv2', 'PR']
     args = parser.parse_args()
     seed_value = args.seed  # 设定随机数种子
 
@@ -141,7 +142,18 @@ if __name__ == '__main__':
 
     logger.info('现在处理的是 {} 数据集\n 随机种子是 {} 删边比例是 {} 训练了 {} 次'.format(args.name, args.seed, args.drop_percent, args.epoch))
 
-    G = nx.read_gml(path, destringizer = int, label='id')
+    # G = nx.read_gml(path, destringizer = int, label='id')
+
+    edges = [
+        (0, 1), (0, 5), (1, 5), (2, 3), (2, 6), (2, 7), (3, 7), (3, 8),
+        (4, 5), (4, 9), (5, 6), (5, 9), (5, 10), (6, 7), (6, 12),
+        (6, 10), (7, 8), (7, 12), (10, 11), (10, 16), (10, 14), (10, 15),
+        (11, 12), (11, 16), (13, 14)
+    ]
+    G = nx.Graph()
+    G.add_edges_from(edges)
+    G.graph['path'] = './my.gml'
+
 
     args = parser.parse_args()
     print(args)

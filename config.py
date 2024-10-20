@@ -3,7 +3,7 @@ import tools
 
 nettype = 'real-world'
 # nettype = 'synthetic'
-name = 'football'
+name = 'polbooks'
 
 def add_flags_from_config(parser, config_dict):
     """
@@ -64,9 +64,9 @@ config_args = {
         'nettype':('real-world', '网络类型'),
         'name':(name, '网络名称'),
         'dataset_path':('./data/{}/{}/{}.gml'.format(nettype,name,name), '数据集位置'),
-        'seed':(2022, '随机种子'),
+        'seed':(280, '随机种子'),
         'savegraph':(True, '是否保存图'),
-        'show':(False, '是否展示图'),
+        'show':(True, '是否展示图'),
         }}
 
 parser = argparse.ArgumentParser()

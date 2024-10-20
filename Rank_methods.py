@@ -3,7 +3,7 @@ import os
 import networkx as nx
 
 import tools
-from Pooling4 import GraphNet
+from Pooling import GraphNet
 import torch
 import time
 import copy
@@ -19,10 +19,10 @@ args = parser.parse_args()
 def rank_by_curv(G, ep = args.epoch, reverse = True):
 
     num_nodes = G.number_of_nodes()
-    feature = tools.generate_feature_matrix(G)
-    # feature = torch.eye(num_nodes, dtype=torch.float)
-    # model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
-    model = GraphNet(in_channels=4, hidden_channels=64, out_channels=32)
+    # feature = tools.generate_feature_matrix(G)
+    feature = torch.eye(num_nodes, dtype=torch.float)
+    model = GraphNet(in_channels=num_nodes, hidden_channels=64, out_channels=32)
+    # model = GraphNet(in_channels=4, hidden_channels=64, out_channels=32)
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
     for epoch in tqdm(range(ep)):
         t = time.time()
