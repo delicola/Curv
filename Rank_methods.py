@@ -3,7 +3,7 @@ import os
 import networkx as nx
 
 import tools
-from Pooling import GraphNet
+from Pooling7 import GraphNet
 import torch
 import time
 import copy
@@ -25,6 +25,8 @@ def rank_by_curv(G, ep = args.epoch, reverse = True):
     # model = GraphNet(in_channels=4, hidden_channels=64, out_channels=32)
     optimizer = optim.Adam(model.parameters(), lr=0.0005)
     for epoch in tqdm(range(ep)):
+        if epoch ==19:
+            print(55)
         t = time.time()
         model.train()
         G0 = copy.deepcopy(G)
@@ -69,7 +71,7 @@ def rank_by_PR(G):
 def rank_by_CI(G,l=1):
     nodes = collective_influence_l(G,l)
     print("CI:",nodes)
-    # nodes = [5, 10, 7, 11, 6, 14, 0, 2, 3, 16, 4, 12, 1, 8, 9, 13, 15]
+    # nodes = [5, 10, 7, 6, 11, 15, 16, 3, 2, 12, 0, 1, 8, 4, 9, 14, 13]
     return nodes
 
 # def rank_by_MY(G):
