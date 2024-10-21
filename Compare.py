@@ -175,7 +175,7 @@ if __name__ == '__main__':
 
     logger.info('现在处理的是 {} 数据集\n 随机种子是 {} 删边比例是 {} 训练了 {} 次'.format(args.name, args.seed, args.drop_percent, args.epoch))
 
-    # G = nx.read_gml(path, destringizer = int, label='id')
+    #G = nx.read_gml(path, destringizer = int, label='id')
 
     # edges = [
     #     (0, 1), (0, 5), (1, 5), (2, 3), (2, 6), (2, 7), (3, 7), (3, 8),

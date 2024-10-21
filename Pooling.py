@@ -349,7 +349,7 @@ class GraphNet(nn.Module):
     #     edge_index = torch.tensor(np.concatenate((source_nodes, target_nodes), axis=0), dtype=torch.long)
     #
     #     return edge_index
-    def forward(self, G, x):
+    def forward(self, G, x, drop_edge_indexs):
         #data = from_networkx(G)
 
         #edge_index = data.edge_index
@@ -366,7 +366,9 @@ class GraphNet(nn.Module):
         x = F.relu(self.conv3(x, edge_index))
         # 应用池化层，删除曲率为负的边，更新后的 edge_index 和 x 会传递给下一层
         x_pool1, new_edge_index1, fitness1, loss1 = self.pool1(x, edge_index, edge_index)
-        drop_edge_index = tools.drop_edge(edge_index, methods='neg')
+        #drop_edge_index = tools.drop_edge(edge_index, methods='neg')
+        drop_edge_index = drop_edge_indexs[1]
+
         x = F.relu(self.conv4(x_pool1, edge_index))
 
         x_pool2, new_edge_index2, fitness2, loss2 = self.pool2(x, drop_edge_index, edge_index)
