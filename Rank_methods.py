@@ -17,9 +17,9 @@ args = parser.parse_args()
 
 
 def rank_by_curv(G, ep = args.epoch, reverse = True):
-    G0 = G.copy()
-    num_nodes = G.number_of_nodes()
-    drop_edge_indexs = tools.cal_curve(G, args.drop_percent, args.drop_times)
+    G0 = G.copy()  #G0的边会变
+    num_nodes = G0.number_of_nodes()
+    drop_edge_indexs = tools.cal_curve(G0, args.drop_percent, args.drop_times)
 
     #feature = tools.generate_feature_matrix(G)
     feature = torch.eye(num_nodes, dtype=torch.float)
@@ -33,7 +33,7 @@ def rank_by_curv(G, ep = args.epoch, reverse = True):
         model.train()
         #G0 = copy.deepcopy(G)
         # 测试模型
-        out, updated_edge_index, loss3, rank_dict = model(G0, feature, drop_edge_indexs)
+        out, updated_edge_index, loss3, rank_dict = model(G, feature, drop_edge_indexs)
         #out, updated_edge_index, loss3, rank_dict = model(G, feature)
         optimizer.zero_grad()
         loss3.backward()

@@ -62,7 +62,7 @@ config_args = {
         'plotremove':(True, '是否画拆解图'),
         'threshold_dismantling':(0.05, '网络拆解之后剩余节点比例'),
         'drop_percent':(0.6, '删除负曲率边的比例'),
-        'epoch':(100, '训练的epoch'),
+        'epoch':(10, '训练的epoch'),
         'nettype':('real-world', '网络类型'),
         'name':(name, '网络名称'),
         'dataset_path':('./data/{}/{}/{}.gml'.format(nettype,name,name), '数据集位置'),
