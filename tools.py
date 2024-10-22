@@ -431,6 +431,7 @@ def cal_curve(G, drop_ratio, drop_times):
 
 def cal_curve(G, drop_percent, drop_times):
     edge_index = edgeIndex(G)#原始图索引
+    #G0 = G.copy()#复制原始图
     # 计算原始图曲率
     orc = OllivierRicci(G, alpha=0.5, verbose='INFO')
     orc.compute_ricci_curvature()
@@ -472,7 +473,7 @@ def cal_curve(G, drop_percent, drop_times):
         #把drop_edge_index转化为list
         edge_neg = [rc for rc in edge_rc_list if rc[2] < 0]#更新负曲率边
 
-    drop_edge_index = list(drop_edge_index)
+    #drop_edge_index = list(drop_edge_index)
 
     return drop_edge_index
 

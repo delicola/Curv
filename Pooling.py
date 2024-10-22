@@ -354,7 +354,7 @@ class GraphNet(nn.Module):
 
         #edge_index = data.edge_index
         #print(edge_index, '\n', edge_index.shape)
-        edge_index = edgeIndex(G)
+        edge_index = drop_edge_indexs[0]
         #TODU
         # print(edge_index.shape)
         # 第一层卷积

@@ -17,6 +17,7 @@ from tools import edgeIndex
 
 def cal_curve(G, drop_ratio, drop_times):
     edge_index = edgeIndex(G)#原始图索引
+    G0 = G.copy()#复制原始图
     # 计算原始图曲率
     orc = OllivierRicci(G, alpha=0.5, verbose='INFO')
     orc.compute_ricci_curvature()
@@ -55,18 +56,17 @@ def cal_curve(G, drop_ratio, drop_times):
             original_edge_rc_list.remove(edge)
         edge_index = edgeIndex(G)#获得新的边索引
         drop_edge_index.append(edge_index)#存储新的边索引
-        #把drop_edge_index转化为list
+
         edge_neg = [rc for rc in original_edge_rc_list if rc[2] < 0]#更新负曲率边
 
-    drop_edge_index = list(drop_edge_index)
 
-    return drop_edge_index
+    return drop_edge_index, G0#因该保存G0因为最后返回的图是被删掉边的图
 
 G = nx.karate_club_graph()
 
-drop_edge_index = cal_curve(G, 0.6, 4)
+drop_edge_index, G0 = cal_curve(G, 0.6, 4)
 
-print(drop_edge_index)
+print(drop_edge_index, G0)
 
 
 
